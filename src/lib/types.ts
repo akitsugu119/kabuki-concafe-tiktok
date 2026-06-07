@@ -71,6 +71,19 @@ export const FILTERS: { value: FeedFilter; label: string }[] = [
   { value: "shop", label: "店舗リンクあり" },
 ];
 
+// 画像バナー広告（フィード内に定期挿入）
+export interface Ad {
+  id: string;
+  /** 広告主名・小さく表示するラベル（任意） */
+  label: string;
+  /** タップ時の遷移先URL */
+  linkUrl: string;
+  isActive: boolean;
+  viewCount: number;
+  clickCount: number;
+  createdAt: string;
+}
+
 // 掲載依頼フォーム（STEP 11）
 export interface PublishRequest {
   id: string;

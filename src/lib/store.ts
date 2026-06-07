@@ -4,7 +4,7 @@
 // 管理操作は localStorage に保存した管理キーを x-admin-key で送る。
 // ===================================================================
 
-import type { DisplayWeight, PublishRequest, Video } from "./types";
+import type { Ad, DisplayWeight, PublishRequest, Video } from "./types";
 
 const ADMIN_KEY_STORE = "kabuki.adminKey.v1";
 
@@ -119,6 +119,85 @@ export async function setPublishRequestStatus(
     method: "PATCH",
     headers: adminHeaders(),
     body: JSON.stringify({ id, status }),
+  });
+  return res.ok;
+}
+
+// ---- 画像バナー広告 -------------------------------------------
+export function adImageUrl(id: string): string {
+  return "/api/ads/" + id + "/image";
+}
+
+export async function getAds(): Promise<Ad[]> {
+  const res = await fetch("/api/ads", { cache: "no-store" });
+  if (!res.ok) return [];
+  return (await res.json()) as Ad[];
+}
+
+export async function getAdsAdmin(): Promise<Ad[]> {
+  const res = await fetch("/api/ads?all=1", { headers: adminHeaders(), cache: "no-store" });
+  if (!res.ok) return [];
+  return (await res.json()) as Ad[];
+}
+
+export async function createAd(input: {
+  label: string;
+  linkUrl: string;
+  imageData: string;
+  imageMime: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const res = await fetch("/api/ads", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    return { ok: false, error: j.error || "登録に失敗しました" };
+  }
+  return { ok: true };
+}
+
+export async function toggleAd(id: string, isActive: boolean): Promise<boolean> {
+  const res = await fetch("/api/ads", {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify({ id, isActive }),
+  });
+  return res.ok;
+}
+
+export async function deleteAd(id: string): Promise<boolean> {
+  const res = await fetch("/api/ads?id=" + encodeURIComponent(id), {
+    method: "DELETE",
+    headers: adminHeaders(),
+  });
+  return res.ok;
+}
+
+function trackAd(id: string, field: "view" | "click") {
+  fetch("/api/ads/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, field }),
+    keepalive: true,
+  }).catch(() => {});
+}
+export const trackAdView = (id: string) => trackAd(id, "view");
+export const trackAdClick = (id: string) => trackAd(id, "click");
+
+// ---- 設定（広告間隔） -----------------------------------------
+export async function getSettings(): Promise<{ adInterval: number }> {
+  const res = await fetch("/api/settings", { cache: "no-store" });
+  if (!res.ok) return { adInterval: 0 };
+  return await res.json();
+}
+
+export async function setAdInterval(adInterval: number): Promise<boolean> {
+  const res = await fetch("/api/settings", {
+    method: "PUT",
+    headers: adminHeaders(),
+    body: JSON.stringify({ adInterval }),
   });
   return res.ok;
 }

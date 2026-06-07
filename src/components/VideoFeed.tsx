@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import FilterBar from "./FilterBar";
 import VideoCard from "./VideoCard";
+import AdCard from "./AdCard";
 import { buildFeed, type FeedItem } from "@/lib/feed";
-import { getVideos, trackView } from "@/lib/store";
+import { getAds, getSettings, getVideos, trackAdView, trackView } from "@/lib/store";
 import { useAsyncData } from "@/lib/useStore";
-import type { FeedFilter, Video } from "@/lib/types";
+import type { Ad, FeedFilter, Video } from "@/lib/types";
 
 const SEED_KEY = "kabuki.seed.v1";
 const FIXEDTOP_KEY = "kabuki.fixedTopShown.v1";
@@ -17,6 +18,8 @@ function filterOffset(f: FeedFilter) {
 
 export default function VideoFeed() {
   const { data: videos, loading } = useAsyncData<Video[]>(getVideos, []);
+  const { data: ads } = useAsyncData<Ad[]>(getAds, []);
+  const { data: settings } = useAsyncData<{ adInterval: number }>(getSettings, { adInterval: 0 });
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -44,13 +47,15 @@ export default function VideoFeed() {
       filter,
       seed: seedRef.current + filterOffset(filter),
       includeFixedTop: filter === "all" && !fixedShownRef.current,
+      ads,
+      adInterval: settings.adInterval,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videos, filter, mounted]);
+  }, [videos, ads, settings, filter, mounted]);
 
   // 固定トップ枠を実際に挿入したら、セッション内では二度と出さない
   useEffect(() => {
-    if (feed.some((i) => i.isFixedTopSlot)) {
+    if (feed.some((i) => i.kind === "video" && i.isFixedTopSlot)) {
       fixedShownRef.current = true;
       sessionStorage.setItem(FIXEDTOP_KEY, "1");
     }
@@ -74,7 +79,8 @@ export default function VideoFeed() {
             const item = feed[idx];
             if (item && !countedKeys.current.has(item.key)) {
               countedKeys.current.add(item.key);
-              trackView(item.video.id);
+              if (item.kind === "ad") trackAdView(item.ad.id);
+              else trackView(item.video.id);
             }
           }
         });
@@ -172,7 +178,11 @@ export default function VideoFeed() {
                 pageRefs.current[i] = el;
               }}
             >
-              <VideoCard item={item} shouldLoad={Math.abs(i - activeIndex) <= 1} />
+              {item.kind === "ad" ? (
+                <AdCard ad={item.ad} />
+              ) : (
+                <VideoCard item={item} shouldLoad={Math.abs(i - activeIndex) <= 1} />
+              )}
             </div>
           ))}
         </div>

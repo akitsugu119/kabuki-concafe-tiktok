@@ -5,7 +5,7 @@
 // 「シーケンス生成」と「固定トップ挿入」を分離している。
 // ===================================================================
 
-import type { FeedFilter, Video } from "./types";
+import type { Ad, FeedFilter, Video } from "./types";
 
 // 小さなシード付き乱数（同一セッション中は安定／セッションごとに変化）
 function mulberry32(seed: number) {
@@ -114,15 +114,29 @@ export interface BuildFeedOptions {
   /** 固定トップ枠を挿入するか（セッションで1回だけ true にする） */
   includeFixedTop?: boolean;
   minGap?: number;
+  /** フィード内に挿入する画像バナー広告 */
+  ads?: Ad[];
+  /** 何本ごとに広告を挿入するか（0以下で広告なし） */
+  adInterval?: number;
 }
 
-export interface FeedItem {
-  video: Video;
-  /** この枠が固定トップ枠として挿入されたものか（PR表記の扱いに使う） */
-  isFixedTopSlot: boolean;
-  /** React key 用の一意キー（同じ動画が複数回出るため） */
-  key: string;
-}
+/** フィードの1枠（動画 or 画像バナー広告） */
+export type FeedItem =
+  | {
+      kind: "video";
+      video: Video;
+      /** この枠が固定トップ枠として挿入されたものか（PR表記の扱いに使う） */
+      isFixedTopSlot: boolean;
+      key: string;
+    }
+  | {
+      kind: "ad";
+      ad: Ad;
+      key: string;
+    };
+
+/** 動画枠だけを取り出した型（VideoCard 用） */
+export type VideoFeedItem = Extract<FeedItem, { kind: "video" }>;
 
 /**
  * 公開フィードを組み立てるメイン関数（STEP 7 + STEP 8）。
@@ -131,7 +145,15 @@ export interface FeedItem {
  * 3. 固定トップ枠を最初の5本以内（1〜5本目）にランダムで1回挿入
  */
 export function buildFeed(allVideos: Video[], opts: BuildFeedOptions): FeedItem[] {
-  const { filter, seed, now = new Date(), includeFixedTop = false, minGap = 5 } = opts;
+  const {
+    filter,
+    seed,
+    now = new Date(),
+    includeFixedTop = false,
+    minGap = 5,
+    ads = [],
+    adInterval = 0,
+  } = opts;
 
   const filtered = applyFilter(allVideos, filter);
 
@@ -149,7 +171,8 @@ export function buildFeed(allVideos: Video[], opts: BuildFeedOptions): FeedItem[
 
   const sequence = buildWeightedSequence(base, seed, minGap);
 
-  const items: FeedItem[] = sequence.map((video, i) => ({
+  const videoItems: FeedItem[] = sequence.map((video, i) => ({
+    kind: "video" as const,
     video,
     isFixedTopSlot: false,
     key: `${video.id}#${i}`,
@@ -158,14 +181,36 @@ export function buildFeed(allVideos: Video[], opts: BuildFeedOptions): FeedItem[
   if (fixedTop) {
     const rng = mulberry32(seed + 999);
     // 1〜5本目（index 0〜4）のどこかにランダムで挿入。先頭固定はしない。
-    const maxInsert = Math.min(5, items.length);
+    const maxInsert = Math.min(5, videoItems.length);
     const insertAt = Math.floor(rng() * maxInsert);
-    items.splice(insertAt, 0, {
+    videoItems.splice(insertAt, 0, {
+      kind: "video" as const,
       video: fixedTop,
       isFixedTopSlot: true,
       key: `${fixedTop.id}#fixedtop`,
     });
   }
 
-  return items;
+  // 画像バナー広告を一定間隔で挿入（filter=all のときだけ）
+  const activeAds = ads.filter((a) => a.isActive);
+  if (filter !== "all" || adInterval <= 0 || activeAds.length === 0) {
+    return videoItems;
+  }
+
+  const rng = mulberry32(seed + 7777);
+  const adOrder = [...activeAds].sort(() => rng() - 0.5);
+
+  const result: FeedItem[] = [];
+  let videoCount = 0;
+  let adIdx = 0;
+  for (const item of videoItems) {
+    result.push(item);
+    videoCount++;
+    if (videoCount % adInterval === 0) {
+      const ad = adOrder[adIdx % adOrder.length];
+      adIdx++;
+      result.push({ kind: "ad", ad, key: `ad-${ad.id}#${adIdx}` });
+    }
+  }
+  return result;
 }

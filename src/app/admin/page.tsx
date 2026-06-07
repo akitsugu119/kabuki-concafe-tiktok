@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { adminLogout } from "@/components/admin/AdminGate";
+import AdsManager from "@/components/admin/AdsManager";
 import {
   getPublishRequests,
   getVideos,
@@ -13,7 +14,7 @@ import { useAsyncData } from "@/lib/useStore";
 import { extractHandle } from "@/lib/tiktok";
 import { type PublishRequest, type Video } from "@/lib/types";
 
-type Tab = "videos" | "report" | "publish";
+type Tab = "videos" | "report" | "publish" | "ads";
 
 export default function AdminDashboard() {
   const { data: videos, refresh: refreshVideos } = useAsyncData<Video[]>(getVideos, []);
@@ -53,6 +54,9 @@ export default function AdminDashboard() {
         <TabBtn active={tab === "report"} onClick={() => setTab("report")}>
           レポート
         </TabBtn>
+        <TabBtn active={tab === "ads"} onClick={() => setTab("ads")}>
+          広告バナー
+        </TabBtn>
         <TabBtn active={tab === "publish"} onClick={() => setTab("publish")}>
           広告依頼{newPublish > 0 && <Dot>{newPublish}</Dot>}
         </TabBtn>
@@ -60,6 +64,7 @@ export default function AdminDashboard() {
 
       {tab === "videos" && <VideosTab videos={videos} onChange={refreshVideos} />}
       {tab === "report" && <ReportTab videos={videos} />}
+      {tab === "ads" && <AdsManager />}
       {tab === "publish" && <PublishTab reqs={publishReqs} onChange={refreshReqs} />}
     </div>
   );

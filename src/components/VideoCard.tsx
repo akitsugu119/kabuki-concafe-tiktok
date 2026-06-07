@@ -1,11 +1,11 @@
 "use client";
 
 import TikTokEmbed from "./TikTokEmbed";
-import type { FeedItem } from "@/lib/feed";
+import type { VideoFeedItem } from "@/lib/feed";
 import { trackShopClick, trackTiktokClick } from "@/lib/store";
 
 interface Props {
-  item: FeedItem;
+  item: VideoFeedItem;
   shouldLoad: boolean;
 }
 

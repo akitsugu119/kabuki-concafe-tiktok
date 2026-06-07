@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { query } from "./db";
 import { isTikTokUrl } from "./tiktok";
-import type { DisplayWeight, PublishRequest, Video } from "./types";
+import type { Ad, DisplayWeight, PublishRequest, Video } from "./types";
 
 // ===================================================================
 // サーバー側データアクセス（PostgreSQL）。API ルートからのみ呼ぶ。
@@ -180,4 +180,83 @@ export async function setPublishRequestStatus(
   status: "new" | "done"
 ): Promise<void> {
   await query("UPDATE publish_requests SET status=$1 WHERE id=$2", [status, id]);
+}
+
+// ---- 画像バナー広告 --------------------------------------------
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function rowToAd(r: any): Ad {
+  return {
+    id: r.id,
+    label: r.label ?? "",
+    linkUrl: r.link_url,
+    isActive: r.is_active,
+    viewCount: r.view_count,
+    clickCount: r.click_count,
+    createdAt: new Date(r.created_at).toISOString(),
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+export async function listAds(activeOnly: boolean): Promise<Ad[]> {
+  const where = activeOnly ? "WHERE is_active = true" : "";
+  const rows = await query(
+    `SELECT id, label, link_url, is_active, view_count, click_count, created_at
+     FROM ads ${where} ORDER BY seq DESC`
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (rows as any[]).map(rowToAd);
+}
+
+export async function createAd(input: {
+  label: string;
+  linkUrl: string;
+  imageData: string;
+  imageMime: string;
+}): Promise<Ad> {
+  const rows = await query(
+    `INSERT INTO ads (id, label, link_url, image_data, image_mime)
+     VALUES ($1,$2,$3,$4,$5)
+     RETURNING id, label, link_url, is_active, view_count, click_count, created_at`,
+    ["ad_" + randomUUID().slice(0, 12), input.label || "", input.linkUrl, input.imageData, input.imageMime || "image/jpeg"]
+  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rowToAd((rows as any[])[0]);
+}
+
+export async function toggleAd(id: string, isActive: boolean): Promise<void> {
+  await query("UPDATE ads SET is_active=$1 WHERE id=$2", [isActive, id]);
+}
+
+export async function deleteAd(id: string): Promise<void> {
+  await query("DELETE FROM ads WHERE id=$1", [id]);
+}
+
+export async function getAdImage(id: string): Promise<{ data: string; mime: string } | null> {
+  const rows = await query<{ image_data: string; image_mime: string }>(
+    "SELECT image_data, image_mime FROM ads WHERE id=$1",
+    [id]
+  );
+  if (rows.length === 0) return null;
+  return { data: rows[0].image_data, mime: rows[0].image_mime };
+}
+
+export async function incrementAdCounter(id: string, field: string): Promise<void> {
+  const col = field === "click" ? "click_count" : field === "view" ? "view_count" : null;
+  if (!col) return;
+  await query(`UPDATE ads SET ${col} = ${col} + 1 WHERE id=$1`, [id]);
+}
+
+// ---- 設定（広告の表示間隔など）---------------------------------
+export async function getAdInterval(): Promise<number> {
+  const rows = await query<{ value: string }>("SELECT value FROM settings WHERE key='ad_interval'");
+  const n = rows.length ? parseInt(rows[0].value, 10) : 7;
+  return Number.isFinite(n) ? n : 7;
+}
+
+export async function setAdInterval(n: number): Promise<void> {
+  await query(
+    `INSERT INTO settings (key, value) VALUES ('ad_interval', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [String(Math.max(0, Math.floor(n)))]
+  );
 }
