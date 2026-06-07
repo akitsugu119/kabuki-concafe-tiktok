@@ -31,7 +31,8 @@ export function tiktokEmbedUrl(videoId: string): string {
 export function tiktokPlayerUrl(videoId: string): string {
   const params = new URLSearchParams({
     autoplay: "1",
-    muted: "1",
+    // muted=0：音アリ。最初の1タップ後はブラウザが音アリ自動再生を許可する
+    muted: "0",
     controls: "1",
     progress_bar: "0",
     timestamp: "0",

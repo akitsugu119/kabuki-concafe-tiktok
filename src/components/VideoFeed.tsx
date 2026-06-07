@@ -154,7 +154,7 @@ export default function VideoFeed() {
       {hasFeed && showHint && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+200px)] z-30 flex justify-center px-6">
           <div className="animate-fade-up rounded-full bg-black/70 px-4 py-2 text-xs font-bold text-white backdrop-blur-md">
-上下にスワイプで移動 ／ 動画内の 🔈 を押すと音が出ます
+最初の動画を1回タップ ▶ 以降は音アリで自動再生・自動送り
           </div>
         </div>
       )}

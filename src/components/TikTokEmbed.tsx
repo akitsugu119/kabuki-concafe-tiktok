@@ -71,15 +71,13 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     w.postMessage(msg, "*");
   }, []);
 
-  // active なら再生、そうでなければ一時停止＋ミュート（前の動画の音が残る問題の対策）
-  // 音アリ再生は、動画内のスピーカー（iframe内のユーザー操作）でのみ可能なため、
-  // ここでは active 動画を強制ミュートしない（ユーザーがオンにした音を維持）。
+  // active なら再生、そうでなければ「一時停止」（ミュートはしない）。
+  // 停止すれば音は止まるので前の動画の音は残らず、かつ音アリ状態を保てる。
   const applyState = useCallback(() => {
     if (activeRef.current) {
       post("play");
     } else {
       post("pause");
-      post("mute");
     }
   }, [post]);
 
