@@ -51,9 +51,12 @@ export default function VideoForm({ initial }: { initial?: Video }) {
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) =>
     setF((prev) => ({ ...prev, [k]: v }));
 
-  const submit = (e: React.FormEvent) => {
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveVideo({
+    setBusy(true);
+    await saveVideo({
       id: initial?.id,
       tiktokUrl: f.tiktokUrl,
       tiktokViewUrl: f.tiktokViewUrl || f.tiktokUrl,
@@ -70,12 +73,15 @@ export default function VideoForm({ initial }: { initial?: Video }) {
       adminMemo: f.adminMemo || undefined,
     });
     router.push("/admin");
+    router.refresh();
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (initial && confirm("この動画を削除します。よろしいですか？")) {
-      deleteVideo(initial.id);
+      setBusy(true);
+      await deleteVideo(initial.id);
       router.push("/admin");
+      router.refresh();
     }
   };
 
@@ -183,8 +189,8 @@ export default function VideoForm({ initial }: { initial?: Video }) {
       </fieldset>
 
       <div className="flex flex-col gap-3">
-        <button type="submit" className="btn-accent w-full py-3.5 text-base">
-          {initial ? "更新する" : "登録する"}
+        <button type="submit" disabled={busy} className="btn-accent w-full py-3.5 text-base disabled:opacity-50">
+          {busy ? "保存中..." : initial ? "更新する" : "登録する"}
         </button>
         {initial && (
           <button

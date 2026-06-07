@@ -5,7 +5,7 @@ import FilterBar from "./FilterBar";
 import VideoCard from "./VideoCard";
 import { buildFeed, type FeedItem } from "@/lib/feed";
 import { getVideos, trackView } from "@/lib/store";
-import { useStoreValue } from "@/lib/useStore";
+import { useAsyncData } from "@/lib/useStore";
 import type { FeedFilter, Video } from "@/lib/types";
 
 const SEED_KEY = "kabuki.seed.v1";
@@ -16,7 +16,7 @@ function filterOffset(f: FeedFilter) {
 }
 
 export default function VideoFeed() {
-  const videos = useStoreValue<Video[]>(getVideos, []);
+  const { data: videos, loading } = useAsyncData<Video[]>(getVideos, []);
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -150,7 +150,11 @@ export default function VideoFeed() {
         </div>
       )}
 
-      {mounted && feed.length === 0 ? (
+      {!mounted || loading ? (
+        <div className="flex h-[100dvh] items-center justify-center">
+          <div className="h-10 w-10 animate-pulse rounded-full bg-accent-grad opacity-70" />
+        </div>
+      ) : feed.length === 0 ? (
         <div className="flex h-[100dvh] items-center justify-center px-8 text-center">
           <p className="text-sm text-white/60">
             この条件で表示できる動画がまだありません。

@@ -1,32 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-// 簡易パスコード（MVP用）。実運用では Supabase Auth 等に置き換える。
-const PASSCODE = process.env.NEXT_PUBLIC_ADMIN_PASSCODE || "kabuki2026";
-const KEY = "kabuki.admin.v1";
+import { adminLogin, clearAdminKey, getAdminKey, setAdminKey } from "@/lib/store";
 
 /**
- * 管理画面の簡易ゲート。
- * ⚠️ クライアント側のみの簡易認証なので、本番では必ずサーバー認証に置き換えること。
+ * 管理画面ゲート。パスコードをサーバー(ADMIN_SECRET)と照合し、
+ * 合致したらキーを localStorage に保存して以降の管理APIに付与する。
  */
 export default function AdminGate({ children }: { children: React.ReactNode }) {
   const [unlocked, setUnlocked] = useState(false);
   const [ready, setReady] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setUnlocked(localStorage.getItem(KEY) === "1");
+    setUnlocked(!!getAdminKey());
     setReady(true);
   }, []);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (input === PASSCODE) {
-      localStorage.setItem(KEY, "1");
+    setBusy(true);
+    setError(false);
+    const ok = await adminLogin(input);
+    setBusy(false);
+    if (ok) {
+      setAdminKey(input);
       setUnlocked(true);
-      setError(false);
     } else {
       setError(true);
     }
@@ -52,8 +53,8 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
             autoFocus
           />
           {error && <p className="mt-2 text-xs text-neon-pink">パスコードが違います</p>}
-          <button type="submit" className="btn-accent mt-4 w-full">
-            ログイン
+          <button type="submit" disabled={busy} className="btn-accent mt-4 w-full disabled:opacity-50">
+            {busy ? "確認中..." : "ログイン"}
           </button>
         </form>
       </div>
@@ -64,6 +65,6 @@ export default function AdminGate({ children }: { children: React.ReactNode }) {
 }
 
 export function adminLogout() {
-  localStorage.removeItem(KEY);
+  clearAdminKey();
   location.href = "/admin";
 }

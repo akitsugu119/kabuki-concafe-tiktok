@@ -1,23 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { subscribe } from "./store";
+import { useCallback, useEffect, useState } from "react";
 
 /**
- * store の変更に追従する汎用フック。
- * SSR/初回ハイドレーション時は localStorage が無いので、
- * マウント後に getter を呼んで値を確定させる（hydration mismatch 回避）。
+ * 非同期データ取得フック（API経由）。
+ * fetcher は安定した参照（モジュール関数）を渡すこと。
  */
-export function useStoreValue<T>(getter: () => T, initial: T): T {
-  const [value, setValue] = useState<T>(initial);
+export function useAsyncData<T>(fetcher: () => Promise<T>, initial: T) {
+  const [data, setData] = useState<T>(initial);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    setValue(getter());
-    const unsub = subscribe(() => setValue(getter()));
-    return unsub;
-    // getter は呼び出し側で安定している前提（毎回同じ関数参照）
+  const refresh = useCallback(() => {
+    setLoading(true);
+    fetcher()
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return value;
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { data, loading, refresh };
 }

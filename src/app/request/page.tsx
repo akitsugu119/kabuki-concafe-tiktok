@@ -26,9 +26,9 @@ export default function RequestPage() {
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addPublishRequest(form);
+    await addPublishRequest(form);
     setDone(true);
   };
 

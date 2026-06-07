@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { addVideosBulk, getVideos } from "@/lib/store";
+import { useAsyncData } from "@/lib/useStore";
 import { isTikTokUrl } from "@/lib/tiktok";
+import type { Video } from "@/lib/types";
 
 /**
  * 複数のTikTok URLをまとめて登録するフォーム（1行＝1URL）。
@@ -12,6 +14,8 @@ import { isTikTokUrl } from "@/lib/tiktok";
 export default function BulkVideoForm() {
   const router = useRouter();
   const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const { data: existingVideos } = useAsyncData<Video[]>(getVideos, []);
   const [result, setResult] = useState<{
     added: number;
     skippedInvalid: number;
@@ -25,7 +29,7 @@ export default function BulkVideoForm() {
       .split(/\r?\n/)
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
-    const existing = new Set(getVideos().map((v) => v.tiktokUrl.trim()));
+    const existing = new Set(existingVideos.map((v) => v.tiktokUrl.trim()));
     const seen = new Set<string>();
     let invalid = 0;
     let duplicate = 0;
@@ -43,16 +47,21 @@ export default function BulkVideoForm() {
       valid++;
     }
     return { total: lines.length, valid, invalid, duplicate };
-  }, [text]);
+  }, [text, existingVideos]);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setBusy(true);
     const urls = text.split(/\r?\n/);
-    const r = addVideosBulk(urls);
+    const r = await addVideosBulk(urls);
+    setBusy(false);
     setResult(r);
     if (r.added > 0) {
       // 少し結果を見せてから一覧へ
-      setTimeout(() => router.push("/admin"), 1200);
+      setTimeout(() => {
+        router.push("/admin");
+        router.refresh();
+      }, 1200);
     }
   };
 
@@ -105,10 +114,14 @@ export default function BulkVideoForm() {
 
       <button
         type="submit"
-        disabled={stats.valid === 0}
+        disabled={stats.valid === 0 || busy}
         className="btn-accent w-full py-3.5 text-base disabled:opacity-40"
       >
-        {stats.valid > 0 ? `${stats.valid} 件をまとめて登録` : "URLを入力してください"}
+        {busy
+          ? "登録中..."
+          : stats.valid > 0
+            ? `${stats.valid} 件をまとめて登録`
+            : "URLを入力してください"}
       </button>
     </form>
   );

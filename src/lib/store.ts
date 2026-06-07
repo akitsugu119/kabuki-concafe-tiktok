@@ -1,261 +1,138 @@
 // ===================================================================
-// データ層（localStorage 実装）
-// -------------------------------------------------------------------
-// 設定不要で動く MVP 用のストア。すべての読み書きをここに集約している
-// ので、後で Supabase / Firebase に差し替える時はこのファイルの中身
-// （関数の実装）だけ書き換えれば、画面側のコードは変えなくて済む。
+// クライアント側データ層（API 経由）
+// localStorage 実装から、サーバー(PostgreSQL)を叩く API 呼び出しに変更。
+// 管理操作は localStorage に保存した管理キーを x-admin-key で送る。
 // ===================================================================
 
-import type { PublishRequest, TakedownRequest, Video } from "./types";
-import { SAMPLE_VIDEOS } from "./sampleData";
-import { isTikTokUrl } from "./tiktok";
+import type { DisplayWeight, PublishRequest, Video } from "./types";
 
-const KEYS = {
-  videos: "kabuki.videos.v2",
-  publishRequests: "kabuki.publishRequests.v1",
-  takedownRequests: "kabuki.takedownRequests.v1",
-} as const;
+const ADMIN_KEY_STORE = "kabuki.adminKey.v1";
 
-const isBrowser = () => typeof window !== "undefined";
-
-// ---- 低レベル read/write ----------------------------------------
-function read<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+export function getAdminKey(): string {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(ADMIN_KEY_STORE) || "";
+}
+export function setAdminKey(k: string) {
+  if (typeof window !== "undefined") window.localStorage.setItem(ADMIN_KEY_STORE, k);
+}
+export function clearAdminKey() {
+  if (typeof window !== "undefined") window.localStorage.removeItem(ADMIN_KEY_STORE);
 }
 
-function write<T>(key: string, value: T) {
-  if (!isBrowser()) return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-  emit();
+function adminHeaders(): HeadersInit {
+  return { "Content-Type": "application/json", "x-admin-key": getAdminKey() };
 }
 
-// ---- 変更通知（React 側が購読して再描画する）--------------------
-type Listener = () => void;
-const listeners = new Set<Listener>();
-function emit() {
-  listeners.forEach((l) => l());
-}
-export function subscribe(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+// ---- 動画（公開読み取り） --------------------------------------
+export async function getVideos(): Promise<Video[]> {
+  const res = await fetch("/api/videos", { cache: "no-store" });
+  if (!res.ok) return [];
+  return (await res.json()) as Video[];
 }
 
-// ---- 初期化（初回アクセス時にサンプルを流し込む）----------------
-export function ensureSeeded() {
-  if (!isBrowser()) return;
-  if (!window.localStorage.getItem(KEYS.videos)) {
-    window.localStorage.setItem(KEYS.videos, JSON.stringify(SAMPLE_VIDEOS));
-  }
+// ---- 動画（管理） ----------------------------------------------
+export type VideoFormInput = Omit<
+  Video,
+  "id" | "createdAt" | "updatedAt" | "viewCount" | "tiktokClickCount" | "shopClickCount"
+> & { id?: string };
+
+export async function saveVideo(input: VideoFormInput): Promise<Video | null> {
+  const res = await fetch("/api/videos", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as Video;
 }
 
-function uid() {
-  return `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+export async function patchVideo(
+  id: string,
+  patch: Partial<Pick<Video, "isActive" | "isPickup" | "isFixedTop">>
+): Promise<boolean> {
+  const res = await fetch("/api/videos", {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify({ id, patch }),
+  });
+  return res.ok;
 }
 
-// ===================================================================
-// 動画 CRUD
-// ===================================================================
-export function getVideos(): Video[] {
-  ensureSeeded();
-  return read<Video[]>(KEYS.videos, SAMPLE_VIDEOS);
+export async function deleteVideo(id: string): Promise<boolean> {
+  const res = await fetch("/api/videos?id=" + encodeURIComponent(id), {
+    method: "DELETE",
+    headers: adminHeaders(),
+  });
+  return res.ok;
 }
 
-export function getVideo(id: string): Video | undefined {
-  return getVideos().find((v) => v.id === id);
-}
-
-export function saveVideo(
-  input: Omit<Video, "id" | "createdAt" | "updatedAt" | "viewCount" | "tiktokClickCount" | "shopClickCount"> &
-    Partial<Pick<Video, "id" | "viewCount" | "tiktokClickCount" | "shopClickCount">>
-): Video {
-  const videos = getVideos();
-  const nowIso = new Date().toISOString();
-
-  if (input.id) {
-    const idx = videos.findIndex((v) => v.id === input.id);
-    if (idx >= 0) {
-      const updated: Video = {
-        ...videos[idx],
-        ...input,
-        id: videos[idx].id,
-        updatedAt: nowIso,
-      } as Video;
-      videos[idx] = updated;
-      write(KEYS.videos, videos);
-      return updated;
-    }
-  }
-
-  const created: Video = {
-    viewCount: 0,
-    tiktokClickCount: 0,
-    shopClickCount: 0,
-    ...input,
-    id: uid(),
-    createdAt: nowIso,
-    updatedAt: nowIso,
-  } as Video;
-  write(KEYS.videos, [created, ...videos]);
-  return created;
-}
-
-/**
- * 複数URLをまとめて登録（管理画面の一括登録用）。
- * - 1件＝通常動画（表示ON・強度1）として作成。登録後に個別編集でピックアップ等を設定。
- * - TikTok以外のURL・空行・重複（既存／貼り付け内）はスキップ。
- * - 全件を1回の書き込みで保存（新しいものほど先頭）。
- */
-export function addVideosBulk(urls: string[]): {
+export async function addVideosBulk(urls: string[]): Promise<{
   added: number;
   skippedInvalid: number;
   skippedDuplicate: number;
-} {
-  const videos = getVideos();
-  const existing = new Set(videos.map((v) => v.tiktokUrl.trim()));
-  const seen = new Set<string>();
-  const nowIso = new Date().toISOString();
-
-  let skippedInvalid = 0;
-  let skippedDuplicate = 0;
-  const created: Video[] = [];
-
-  for (const raw of urls) {
-    const url = (raw || "").trim();
-    if (!url) continue;
-    if (!isTikTokUrl(url)) {
-      skippedInvalid++;
-      continue;
-    }
-    if (existing.has(url) || seen.has(url)) {
-      skippedDuplicate++;
-      continue;
-    }
-    seen.add(url);
-    created.push({
-      id: uid(),
-      tiktokUrl: url,
-      tiktokViewUrl: url,
-      isActive: true,
-      isPickup: false,
-      badgeLabel: "今注目",
-      showPrLabel: false,
-      displayWeight: 1,
-      isFixedTop: false,
-      viewCount: 0,
-      tiktokClickCount: 0,
-      shopClickCount: 0,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    });
-  }
-
-  if (created.length > 0) {
-    write(KEYS.videos, [...created, ...videos]);
-  }
-  return { added: created.length, skippedInvalid, skippedDuplicate };
+}> {
+  const res = await fetch("/api/videos/bulk", {
+    method: "POST",
+    headers: adminHeaders(),
+    body: JSON.stringify({ urls }),
+  });
+  if (!res.ok) return { added: 0, skippedInvalid: 0, skippedDuplicate: 0 };
+  return await res.json();
 }
 
-export function deleteVideo(id: string) {
-  write(
-    KEYS.videos,
-    getVideos().filter((v) => v.id !== id)
-  );
+// ---- 計測（公開・撃ちっぱなし） --------------------------------
+function track(id: string, field: "view" | "tiktok" | "shop") {
+  fetch("/api/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, field }),
+    keepalive: true,
+  }).catch(() => {});
+}
+export const trackView = (id: string) => track(id, "view");
+export const trackTiktokClick = (id: string) => track(id, "tiktok");
+export const trackShopClick = (id: string) => track(id, "shop");
+
+// ---- 広告依頼 --------------------------------------------------
+export async function getPublishRequests(): Promise<PublishRequest[]> {
+  const res = await fetch("/api/requests", { headers: adminHeaders(), cache: "no-store" });
+  if (!res.ok) return [];
+  return (await res.json()) as PublishRequest[];
 }
 
-/** 表示ON/OFF・ピックアップ等のトグルをまとめて更新 */
-export function patchVideo(id: string, patch: Partial<Video>) {
-  const videos = getVideos();
-  const idx = videos.findIndex((v) => v.id === id);
-  if (idx < 0) return;
-  videos[idx] = { ...videos[idx], ...patch, updatedAt: new Date().toISOString() };
-  write(KEYS.videos, videos);
-}
-
-export function resetToSample() {
-  if (!isBrowser()) return;
-  window.localStorage.setItem(KEYS.videos, JSON.stringify(SAMPLE_VIDEOS));
-  emit();
-}
-
-// ===================================================================
-// 計測（STEP 10）
-// ===================================================================
-export function trackView(id: string) {
-  bump(id, "viewCount");
-}
-export function trackTiktokClick(id: string) {
-  bump(id, "tiktokClickCount");
-}
-export function trackShopClick(id: string) {
-  bump(id, "shopClickCount");
-}
-
-function bump(id: string, field: "viewCount" | "tiktokClickCount" | "shopClickCount") {
-  const videos = getVideos();
-  const idx = videos.findIndex((v) => v.id === id);
-  if (idx < 0) return;
-  videos[idx] = { ...videos[idx], [field]: (videos[idx][field] ?? 0) + 1 };
-  // 計測は頻発するので emit するが、UI 更新を最小化するため write をそのまま使う
-  write(KEYS.videos, videos);
-}
-
-// ===================================================================
-// 掲載依頼（STEP 11）
-// ===================================================================
-export function getPublishRequests(): PublishRequest[] {
-  return read<PublishRequest[]>(KEYS.publishRequests, []);
-}
-
-export function addPublishRequest(
+export async function addPublishRequest(
   input: Omit<PublishRequest, "id" | "createdAt" | "status">
-): PublishRequest {
-  const created: PublishRequest = {
-    ...input,
-    id: uid(),
-    createdAt: new Date().toISOString(),
-    status: "new",
-  };
-  write(KEYS.publishRequests, [created, ...getPublishRequests()]);
-  return created;
+): Promise<boolean> {
+  const res = await fetch("/api/requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return res.ok;
 }
 
-export function setPublishRequestStatus(id: string, status: PublishRequest["status"]) {
-  write(
-    KEYS.publishRequests,
-    getPublishRequests().map((r) => (r.id === id ? { ...r, status } : r))
-  );
+export async function setPublishRequestStatus(
+  id: string,
+  status: "new" | "done"
+): Promise<boolean> {
+  const res = await fetch("/api/requests", {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify({ id, status }),
+  });
+  return res.ok;
 }
 
-// ===================================================================
-// 掲載停止・修正依頼（STEP 12）
-// ===================================================================
-export function getTakedownRequests(): TakedownRequest[] {
-  return read<TakedownRequest[]>(KEYS.takedownRequests, []);
+// ---- 管理ログイン ---------------------------------------------
+export async function adminLogin(key: string): Promise<boolean> {
+  const res = await fetch("/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key }),
+  });
+  if (!res.ok) return false;
+  const j = await res.json();
+  return !!j.ok;
 }
 
-export function addTakedownRequest(
-  input: Omit<TakedownRequest, "id" | "createdAt" | "status">
-): TakedownRequest {
-  const created: TakedownRequest = {
-    ...input,
-    id: uid(),
-    createdAt: new Date().toISOString(),
-    status: "new",
-  };
-  write(KEYS.takedownRequests, [created, ...getTakedownRequests()]);
-  return created;
-}
-
-export function setTakedownRequestStatus(id: string, status: TakedownRequest["status"]) {
-  write(
-    KEYS.takedownRequests,
-    getTakedownRequests().map((r) => (r.id === id ? { ...r, status } : r))
-  );
-}
+export type { DisplayWeight };

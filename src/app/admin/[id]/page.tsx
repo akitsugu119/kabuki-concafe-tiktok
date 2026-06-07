@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import VideoForm from "@/components/admin/VideoForm";
 import { getVideos } from "@/lib/store";
-import { useStoreValue } from "@/lib/useStore";
+import { useAsyncData } from "@/lib/useStore";
 import type { Video } from "@/lib/types";
 
 export default function EditVideoPage() {
   const params = useParams();
   const id = String(params.id);
-  const videos = useStoreValue<Video[]>(getVideos, []);
+  const { data: videos, loading } = useAsyncData<Video[]>(getVideos, []);
   const video = videos.find((v) => v.id === id);
 
   return (
@@ -26,7 +26,9 @@ export default function EditVideoPage() {
         <h1 className="text-lg font-bold">動画を編集</h1>
       </header>
 
-      {video ? (
+      {loading ? (
+        <p className="p-8 text-center text-sm text-white/40">読み込み中…</p>
+      ) : video ? (
         <VideoForm initial={video} />
       ) : (
         <p className="rounded-2xl border border-white/10 bg-ink-700/30 p-8 text-center text-sm text-white/50">

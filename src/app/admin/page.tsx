@@ -5,32 +5,25 @@ import { useState } from "react";
 import { adminLogout } from "@/components/admin/AdminGate";
 import {
   getPublishRequests,
-  getTakedownRequests,
   getVideos,
   patchVideo,
-  resetToSample,
   setPublishRequestStatus,
-  setTakedownRequestStatus,
 } from "@/lib/store";
-import { useStoreValue } from "@/lib/useStore";
+import { useAsyncData } from "@/lib/useStore";
 import { extractHandle } from "@/lib/tiktok";
-import {
-  TAKEDOWN_TYPES,
-  type PublishRequest,
-  type TakedownRequest,
-  type Video,
-} from "@/lib/types";
+import { type PublishRequest, type Video } from "@/lib/types";
 
-type Tab = "videos" | "report" | "publish" | "takedown";
+type Tab = "videos" | "report" | "publish";
 
 export default function AdminDashboard() {
-  const videos = useStoreValue<Video[]>(getVideos, []);
-  const publishReqs = useStoreValue<PublishRequest[]>(getPublishRequests, []);
-  const takedownReqs = useStoreValue<TakedownRequest[]>(getTakedownRequests, []);
+  const { data: videos, refresh: refreshVideos } = useAsyncData<Video[]>(getVideos, []);
+  const { data: publishReqs, refresh: refreshReqs } = useAsyncData<PublishRequest[]>(
+    getPublishRequests,
+    []
+  );
   const [tab, setTab] = useState<Tab>("videos");
 
   const newPublish = publishReqs.filter((r) => r.status === "new").length;
-  const newTakedown = takedownReqs.filter((r) => r.status === "new").length;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-5 pb-24">
@@ -61,23 +54,26 @@ export default function AdminDashboard() {
           レポート
         </TabBtn>
         <TabBtn active={tab === "publish"} onClick={() => setTab("publish")}>
-          掲載依頼{newPublish > 0 && <Dot>{newPublish}</Dot>}
-        </TabBtn>
-        <TabBtn active={tab === "takedown"} onClick={() => setTab("takedown")}>
-          停止・修正{newTakedown > 0 && <Dot>{newTakedown}</Dot>}
+          広告依頼{newPublish > 0 && <Dot>{newPublish}</Dot>}
         </TabBtn>
       </div>
 
-      {tab === "videos" && <VideosTab videos={videos} />}
+      {tab === "videos" && <VideosTab videos={videos} onChange={refreshVideos} />}
       {tab === "report" && <ReportTab videos={videos} />}
-      {tab === "publish" && <PublishTab reqs={publishReqs} />}
-      {tab === "takedown" && <TakedownTab reqs={takedownReqs} />}
+      {tab === "publish" && <PublishTab reqs={publishReqs} onChange={refreshReqs} />}
     </div>
   );
 }
 
 // ============================ 動画一覧（STEP 9）============================
-function VideosTab({ videos }: { videos: Video[] }) {
+function VideosTab({ videos, onChange }: { videos: Video[]; onChange: () => void }) {
+  const toggle = async (
+    id: string,
+    patch: Partial<Pick<Video, "isActive" | "isPickup" | "isFixedTop">>
+  ) => {
+    await patchVideo(id, patch);
+    onChange();
+  };
   return (
     <div className="flex flex-col gap-3">
       {videos.length === 0 && <Empty>動画がまだありません。「＋ 新規登録」から追加できます。</Empty>}
@@ -107,19 +103,19 @@ function VideosTab({ videos }: { videos: Video[] }) {
               on={v.isActive}
               onLabel="表示ON"
               offLabel="表示OFF"
-              onClick={() => patchVideo(v.id, { isActive: !v.isActive })}
+              onClick={() => toggle(v.id, { isActive: !v.isActive })}
             />
             <Toggle
               on={v.isPickup}
               onLabel="ピックアップ"
               offLabel="ピックアップ"
-              onClick={() => patchVideo(v.id, { isPickup: !v.isPickup })}
+              onClick={() => toggle(v.id, { isPickup: !v.isPickup })}
             />
             <Toggle
               on={v.isFixedTop}
               onLabel="固定トップ"
               offLabel="固定トップ"
-              onClick={() => patchVideo(v.id, { isFixedTop: !v.isFixedTop })}
+              onClick={() => toggle(v.id, { isFixedTop: !v.isFixedTop })}
             />
             <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-white/55">
               強度 ×{v.displayWeight}
@@ -133,15 +129,6 @@ function VideosTab({ videos }: { videos: Video[] }) {
           </div>
         </div>
       ))}
-
-      <button
-        onClick={() => {
-          if (confirm("動画データをサンプルに戻します。よろしいですか？")) resetToSample();
-        }}
-        className="mt-4 self-start text-xs text-white/40 underline"
-      >
-        サンプルデータに戻す
-      </button>
     </div>
   );
 }
@@ -229,9 +216,9 @@ function ReportTab({ videos }: { videos: Video[] }) {
   );
 }
 
-// ============================ 掲載依頼（STEP 11）============================
-function PublishTab({ reqs }: { reqs: PublishRequest[] }) {
-  if (reqs.length === 0) return <Empty>掲載依頼はまだありません。</Empty>;
+// ============================ 広告依頼（STEP 11）============================
+function PublishTab({ reqs, onChange }: { reqs: PublishRequest[]; onChange: () => void }) {
+  if (reqs.length === 0) return <Empty>広告依頼はまだありません。</Empty>;
   return (
     <div className="flex flex-col gap-3">
       {reqs.map((r) => (
@@ -250,43 +237,10 @@ function PublishTab({ reqs }: { reqs: PublishRequest[] }) {
           {r.message && <Row k="メッセージ" v={r.message} />}
           {r.status === "new" && (
             <button
-              onClick={() => setPublishRequestStatus(r.id, "done")}
-              className="mt-3 rounded-full bg-white/10 px-3 py-1.5 text-xs"
-            >
-              対応済みにする
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ============================ 停止・修正依頼（STEP 12）============================
-function TakedownTab({ reqs }: { reqs: TakedownRequest[] }) {
-  if (reqs.length === 0) return <Empty>停止・修正依頼はまだありません。</Empty>;
-  const typeLabel = (t: string) => TAKEDOWN_TYPES.find((x) => x.value === t)?.label ?? t;
-  return (
-    <div className="flex flex-col gap-3">
-      {reqs.map((r) => (
-        <div key={r.id} className="rounded-2xl border border-white/10 bg-ink-700/40 p-4 text-sm">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="rounded-full bg-neon-pink/20 px-2.5 py-1 text-[11px] font-bold text-neon-rose">
-              {typeLabel(r.type)}
-            </span>
-            <span className="text-[11px] text-white/40">
-              {new Date(r.createdAt).toLocaleString("ja-JP")}
-            </span>
-          </div>
-          <Row k="動画URL" v={r.tiktokUrl} />
-          <Row k="理由" v={r.reason} />
-          <Row k="連絡先" v={r.contact} />
-          <div className="mt-2">
-            <StatusPill status={r.status} />
-          </div>
-          {r.status === "new" && (
-            <button
-              onClick={() => setTakedownRequestStatus(r.id, "done")}
+              onClick={async () => {
+                await setPublishRequestStatus(r.id, "done");
+                onChange();
+              }}
               className="mt-3 rounded-full bg-white/10 px-3 py-1.5 text-xs"
             >
               対応済みにする
