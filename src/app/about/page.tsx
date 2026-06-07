@@ -21,17 +21,14 @@ export default function AboutPage() {
         </section>
 
         <section>
-          <h2 className="mb-2 text-sm font-bold text-white">掲載・停止について</h2>
+          <h2 className="mb-2 text-sm font-bold text-white">広告掲載について</h2>
           <p className="text-white/75">
-            掲載のご依頼、または掲載停止・情報修正・店舗リンク削除のご依頼は、以下のページから受け付けています。
-            ご本人・店舗からのご依頼には速やかに対応いたします。
+            店舗・キャストの広告掲載（「今注目」枠・固定トップ枠など）のご依頼を受け付けています。
+            掲載内容の削除・修正のご希望も、こちらのフォームよりご連絡ください。
           </p>
-          <div className="mt-4 flex flex-col gap-2">
-            <Link href="/request" className="btn-ghost w-full">
-              掲載依頼ページへ
-            </Link>
-            <Link href="/takedown" className="btn-accent w-full">
-              掲載停止・修正依頼ページへ
+          <div className="mt-4">
+            <Link href="/request" className="btn-accent w-full">
+              広告依頼ページへ
             </Link>
           </div>
         </section>

@@ -43,12 +43,7 @@ export default function AppMenu() {
 
             <ul className="flex flex-col gap-1 text-sm">
               <MenuLink href="/" label="トップ（動画を見る）" onClick={() => setOpen(false)} />
-              <MenuLink href="/request" label="掲載依頼" onClick={() => setOpen(false)} />
-              <MenuLink
-                href="/takedown"
-                label="掲載停止・修正依頼"
-                onClick={() => setOpen(false)}
-              />
+              <MenuLink href="/request" label="広告依頼" onClick={() => setOpen(false)} />
               <MenuLink href="/about" label="このサイトについて" onClick={() => setOpen(false)} />
               <li className="my-2 h-px bg-white/10" />
               <MenuLink href="/admin" label="管理画面" onClick={() => setOpen(false)} muted />

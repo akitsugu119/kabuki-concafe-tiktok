@@ -33,17 +33,17 @@ export default function RequestPage() {
   };
 
   return (
-    <PageShell title="掲載依頼">
+    <PageShell title="広告依頼">
       {done ? (
         <SuccessNote>
-          掲載依頼を受け付けました。
+          広告依頼を受け付けました。
           <br />
-          内容を確認のうえ、必要に応じてご連絡いたします。
+          内容を確認のうえ、担当者よりご連絡いたします。
         </SuccessNote>
       ) : (
         <>
           <p className="mb-6 text-sm leading-relaxed text-white/70">
-            かぶきコンカフェ嬢TikTokまとめでは、歌舞伎町コンカフェ嬢のTikTok動画の掲載依頼を受け付けています。
+            かぶきコンカフェ嬢TikTokまとめでは、店舗・キャストの広告掲載（「今注目」枠・固定トップ枠など）のご依頼を受け付けています。
             動画はTikTok公式埋め込みで表示し、動画ファイルを自サイトに保存することはありません。
           </p>
 
@@ -100,7 +100,7 @@ export default function RequestPage() {
               />
             </Field>
 
-            <SubmitButton>掲載依頼を送る</SubmitButton>
+            <SubmitButton>広告依頼を送る</SubmitButton>
           </form>
         </>
       )}
