@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import FilterBar from "./FilterBar";
 import VideoCard from "./VideoCard";
 import AdCard from "./AdCard";
@@ -41,17 +41,47 @@ export default function VideoFeed() {
     setMounted(true);
   }, []);
 
-  const feed: FeedItem[] = useMemo(() => {
-    if (!mounted) return [];
-    return buildFeed(videos, {
-      filter,
-      seed: seedRef.current + filterOffset(filter),
-      includeFixedTop: filter === "all" && !fixedShownRef.current,
-      ads,
-      adInterval: settings.adInterval,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videos, ads, settings, filter, mounted]);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const batchRef = useRef(0);
+
+  // 1バッチ分のフィードを生成（バッチ番号で key を一意化）
+  const buildBatch = useCallback(
+    (batch: number, withFixedTop: boolean): FeedItem[] => {
+      const items = buildFeed(videos, {
+        filter,
+        seed: seedRef.current + filterOffset(filter) + batch * 1000,
+        includeFixedTop: withFixedTop,
+        ads,
+        adInterval: settings.adInterval,
+      });
+      items.forEach((it) => {
+        it.key = `b${batch}-${it.key}`;
+      });
+      return items;
+    },
+    [videos, ads, settings, filter]
+  );
+
+  // データ/フィルター変更時：最初のバッチを生成
+  useEffect(() => {
+    if (!mounted) return;
+    const first = buildBatch(0, filter === "all" && !fixedShownRef.current);
+    batchRef.current = 1;
+    countedKeys.current = new Set();
+    setActiveIndex(0);
+    setFeed(first);
+  }, [mounted, buildBatch, filter]);
+
+  // 終わりに近づいたら次のバッチを自動追加（無限スクロール・同じ動画もOK）
+  useEffect(() => {
+    if (!mounted || feed.length === 0) return;
+    if (feed.length >= 600) return; // メモリ保護の上限
+    if (activeIndex >= feed.length - 3) {
+      const more = buildBatch(batchRef.current, false);
+      batchRef.current += 1;
+      setFeed((prev) => [...prev, ...more]);
+    }
+  }, [activeIndex, feed.length, mounted, buildBatch]);
 
   // 固定トップ枠を実際に挿入したら、セッション内では二度と出さない
   useEffect(() => {
