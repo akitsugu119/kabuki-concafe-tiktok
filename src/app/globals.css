@@ -1,0 +1,72 @@
+@import url("https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* 丸みのある読みやすい日本語フォント */
+  --font-rounded: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: #0a0710;
+  color: #ffffff;
+  font-family: var(--font-rounded);
+  -webkit-font-smoothing: antialiased;
+  /* iOS のバウンス時に黒背景が見えるように */
+  overscroll-behavior-y: none;
+}
+
+@layer components {
+  /* TikTok風 縦スワイプ（STEP 4）：1画面1動画でピタッと止まる */
+  .swipe-feed {
+    height: 100dvh;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .swipe-feed::-webkit-scrollbar {
+    display: none;
+  }
+  .swipe-page {
+    height: 100dvh;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  /* グラデのアクセントボタン */
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3
+           text-sm font-bold text-white bg-accent-grad shadow-neon
+           active:scale-[0.98] transition;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3
+           text-sm font-bold text-white/95 bg-white/10 backdrop-blur
+           border border-white/15 active:scale-[0.98] transition;
+  }
+
+  /* 「今注目」バッジ：小さく可愛く */
+  .badge-pickup {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1
+           text-[11px] font-bold text-white bg-accent-grad-soft shadow-neon-soft;
+  }
+  /* PR表記：目立ちすぎない */
+  .label-pr {
+    @apply inline-flex items-center rounded px-1.5 py-0.5
+           text-[10px] font-medium text-white/70 bg-white/10;
+  }
+}
+
+/* テキストの発光感（控えめ） */
+.text-neon {
+  text-shadow: 0 0 12px rgba(255, 95, 162, 0.45), 0 0 22px rgba(155, 109, 255, 0.3);
+}

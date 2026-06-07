@@ -1,0 +1,20 @@
+# Render Blueprint（https://render.com/docs/blueprint-spec）
+# Render ダッシュボードで「New +」→「Blueprint」を選び、このリポジトリを指定すると
+# 下記設定で Web Service が自動作成されます。
+services:
+  - type: web
+    name: kabuki-concafe-tiktok
+    runtime: node
+    plan: starter            # 課金プランに合わせて変更可（free / starter など）
+    region: singapore        # 日本に近いリージョン（oregon等に変更可）
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true         # GitHub に push すると自動で再デプロイ
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # 管理画面のパスコード（任意で変更）。未設定なら kabuki2026
+      - key: NEXT_PUBLIC_ADMIN_PASSCODE
+        value: kabuki2026
