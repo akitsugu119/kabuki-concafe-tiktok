@@ -1,40 +1,53 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   extractHandle,
   extractTikTokId,
   isPlaceholderId,
   isShortLink,
   resolveShortLink,
-  tiktokEmbedUrl,
+  tiktokPlayerUrl,
 } from "@/lib/tiktok";
 
 interface Props {
   url: string;
-  /** true のときだけ実際に読み込む（前後の動画のみ：STEP 5 のパフォーマンス対策） */
+  /** true のときだけ iframe を読み込む（前後の動画のみ：パフォーマンス対策） */
   shouldLoad: boolean;
+  /** 今まさに画面に出ている動画か（自動再生・音の対象） */
+  active: boolean;
+  /** 音を出す設定（ユーザーが一度タップした後だけ true にできる） */
+  soundOn: boolean;
+  /** 動画が最後まで再生し終わったとき */
+  onEnded?: () => void;
 }
 
 /**
- * TikTok 公式埋め込み（iframe）。
- * - URLに数値IDがある → そのまま埋め込み
- * - 短縮URL（vt.tiktok.com/...）→ /api/resolve で oEmbed 解決してから埋め込み
- * - 仮ID（サンプル）→ デモカード
- * - 解決不可・埋め込み不可 → エラー表示
+ * TikTok 公式プレーヤー（player/v1）。
+ * - active のものだけ再生、それ以外は一時停止＋ミュート（前の音が残る問題の対策）
+ * - soundOn なら unMute（要・事前のユーザー操作）
+ * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）
  */
-export default function TikTokEmbed({ url, shouldLoad }: Props) {
+export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded }: Props) {
   const directId = extractTikTokId(url);
   const short = isShortLink(url);
 
   const [resolvedId, setResolvedId] = useState<string | null>(directId);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
 
-  useEffect(() => {
-    if (directId || resolvedId) return; // すでにID確定
-    if (!short) return; // 短縮でもなくIDも無い → 後段でエラー
-    if (!shouldLoad) return; // 遅延読み込み
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const readyRef = useRef(false);
+  const activeRef = useRef(active);
+  const soundRef = useRef(soundOn);
+  const onEndedRef = useRef(onEnded);
+  activeRef.current = active;
+  soundRef.current = soundOn;
+  onEndedRef.current = onEnded;
 
+  // 短縮URLの解決
+  useEffect(() => {
+    if (directId || resolvedId) return;
+    if (!short || !shouldLoad) return;
     let cancelled = false;
     setStatus("loading");
     resolveShortLink(url)
@@ -43,40 +56,79 @@ export default function TikTokEmbed({ url, shouldLoad }: Props) {
         if (res?.videoId) {
           setResolvedId(res.videoId);
           setStatus("idle");
-        } else {
-          setStatus("error");
-        }
+        } else setStatus("error");
       })
       .catch(() => !cancelled && setStatus("error"));
-
     return () => {
       cancelled = true;
     };
   }, [url, short, directId, resolvedId, shouldLoad]);
 
-  // 仮ID（サンプルの連番）→ デモカード
-  if (directId && isPlaceholderId(directId)) {
-    return <DemoCard url={url} />;
-  }
+  // プレーヤーへコマンド送信
+  const post = useCallback((type: string, value?: number) => {
+    const w = iframeRef.current?.contentWindow;
+    if (!w) return;
+    const msg =
+      value === undefined
+        ? { "x-tiktok-player": true, type }
+        : { "x-tiktok-player": true, type, value };
+    w.postMessage(msg, "*");
+  }, []);
 
-  // ID取得不可（短縮でもない不正URL or 解決失敗）→ エラー
-  if ((!resolvedId && !short) || status === "error") {
-    return <ErrorCard />;
-  }
+  // 現在の active / soundOn に合わせて再生状態を適用
+  const applyState = useCallback(() => {
+    if (activeRef.current) {
+      post("play");
+      post(soundRef.current ? "unMute" : "mute");
+    } else {
+      post("pause");
+      post("mute");
+    }
+  }, [post]);
 
-  // まだ読み込みタイミングでない／解決中 → 軽量プレースホルダ
-  if (!resolvedId) {
-    return <PosterCard loading={status === "loading"} />;
-  }
+  // プレーヤーからのイベント受信（このiframe由来のみ）
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      const w = iframeRef.current?.contentWindow;
+      if (!w || e.source !== w) return;
+      let data: unknown = e.data;
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          return;
+        }
+      }
+      if (!data || typeof data !== "object") return;
+      const d = data as { type?: string; value?: number };
+      if (d.type === "onPlayerReady") {
+        readyRef.current = true;
+        applyState();
+      } else if (d.type === "onStateChange" && d.value === 0) {
+        // 0 = ended
+        if (activeRef.current) onEndedRef.current?.();
+      }
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, [applyState]);
 
-  if (!shouldLoad) {
-    return <PosterCard loading={false} />;
-  }
+  // active / soundOn が変わったら反映
+  useEffect(() => {
+    if (readyRef.current) applyState();
+  }, [active, soundOn, applyState]);
+
+  // ---- 表示分岐 ----
+  if (directId && isPlaceholderId(directId)) return <DemoCard url={url} />;
+  if ((!resolvedId && !short) || status === "error") return <ErrorCard />;
+  if (!resolvedId) return <PosterCard loading={status === "loading"} />;
+  if (!shouldLoad) return <PosterCard loading={false} />;
 
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-black">
       <iframe
-        src={tiktokEmbedUrl(resolvedId)}
+        ref={iframeRef}
+        src={tiktokPlayerUrl(resolvedId)}
         title="TikTok 動画"
         loading="lazy"
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"

@@ -7,6 +7,9 @@ import { trackShopClick, trackTiktokClick } from "@/lib/store";
 interface Props {
   item: VideoFeedItem;
   shouldLoad: boolean;
+  active: boolean;
+  soundOn: boolean;
+  onEnded?: () => void;
 }
 
 /**
@@ -14,7 +17,7 @@ interface Props {
  * - 通常動画：TikTok埋め込み ＋「TikTokで見る」だけ
  * - ピックアップ／固定トップ：今注目バッジ・PR表記・店舗名・店舗公式ボタンも表示
  */
-export default function VideoCard({ item, shouldLoad }: Props) {
+export default function VideoCard({ item, shouldLoad, active, soundOn, onEnded }: Props) {
   const { video, isFixedTopSlot } = item;
 
   // ピックアップ表示するか（ピックアップ動画 or 固定トップ枠）
@@ -37,7 +40,13 @@ export default function VideoCard({ item, shouldLoad }: Props) {
     <section className="swipe-page relative flex items-center justify-center px-3">
       {/* 動画本体（中央・縦長カラム） */}
       <div className="relative h-[78dvh] w-full max-w-[460px]">
-        <TikTokEmbed url={video.tiktokUrl} shouldLoad={shouldLoad} />
+        <TikTokEmbed
+          url={video.tiktokUrl}
+          shouldLoad={shouldLoad}
+          active={active}
+          soundOn={soundOn}
+          onEnded={onEnded}
+        />
 
         {/* 上部：バッジ（ピックアップ／固定トップのみ） */}
         {showPickupUI && (

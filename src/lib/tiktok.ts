@@ -18,9 +18,29 @@ export function extractTikTokId(url: string): string | null {
   return null;
 }
 
-/** 公式埋め込み iframe の URL */
+/** 公式埋め込み iframe の URL（旧・blockquote型） */
 export function tiktokEmbedUrl(videoId: string): string {
   return `https://www.tiktok.com/embed/v2/${videoId}`;
+}
+
+/**
+ * 公式プレーヤーAPIのURL（player/v1）。
+ * postMessage で play/pause/mute/unMute を制御でき、終了イベントも取れる。
+ * autoplay=1&muted=1 でミュート自動再生（ブラウザは音アリ自動再生を禁止のため）。
+ */
+export function tiktokPlayerUrl(videoId: string): string {
+  const params = new URLSearchParams({
+    autoplay: "1",
+    muted: "1",
+    controls: "1",
+    progress_bar: "0",
+    timestamp: "0",
+    fullscreen_button: "0",
+    music_info: "0",
+    description: "0",
+    rel: "0",
+  });
+  return `https://www.tiktok.com/player/v1/${videoId}?${params.toString()}`;
 }
 
 /**
