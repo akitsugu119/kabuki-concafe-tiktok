@@ -127,7 +127,15 @@ function NewAdForm({ onCreated }: { onCreated: () => void }) {
     >
       <h2 className="text-sm font-bold text-neon-rose">広告を追加（画像バナー）</h2>
 
-      <Field label="広告画像" required hint="縦長推奨・2MBまで（JPG/PNG）">
+      <div className="rounded-xl border border-white/10 bg-ink-700/60 p-3 text-[11px] leading-relaxed text-white/60">
+        <p className="mb-1 font-bold text-white/80">📐 推奨サイズ</p>
+        ・<b className="text-white/80">縦長 9:16</b>（推奨 1080×1920px ／ 最低 720×1280px）<br />
+        ・形式：JPG または PNG ／ 容量：2MBまで（軽さ重視なら〜500KB）<br />
+        ・大事な文字・ロゴは<b className="text-white/80">中央寄せ</b>に。
+        左上（「広告 PR」表記）と画面下（ボタン）に重ならないよう、上下の端は余白を取ると安全
+      </div>
+
+      <Field label="広告画像" required hint="9:16 縦長推奨・2MBまで（JPG/PNG）">
         <input
           type="file"
           accept="image/*"
