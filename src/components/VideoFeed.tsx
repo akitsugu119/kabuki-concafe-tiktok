@@ -29,6 +29,7 @@ export default function VideoFeed() {
   const fixedShownRef = useRef(false);
   const countedKeys = useRef<Set<string>>(new Set());
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const feedRef = useRef<HTMLDivElement | null>(null);
 
   // セッションごとのシード＆固定トップ表示済みフラグを初期化
   useEffect(() => {
@@ -98,29 +99,37 @@ export default function VideoFeed() {
     pageRefs.current[0]?.scrollIntoView();
   }, [filter]);
 
-  // 表示中の動画を検知（アクティブ判定＋表示回数計測＋遅延読み込み）
+  // アクティブ判定：スクロール位置から確実に算出（scroll-snap向け・閾値方式の取りこぼし対策）
   useEffect(() => {
-    if (!mounted || feed.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            const idx = Number((entry.target as HTMLElement).dataset.index);
-            setActiveIndex(idx);
-            const item = feed[idx];
-            if (item && !countedKeys.current.has(item.key)) {
-              countedKeys.current.add(item.key);
-              if (item.kind === "ad") trackAdView(item.ad.id);
-              else trackView(item.video.id);
-            }
-          }
-        });
-      },
-      { threshold: [0.6] }
-    );
-    pageRefs.current.forEach((el) => el && observer.observe(el));
-    return () => observer.disconnect();
-  }, [mounted, feed]);
+    if (!mounted) return;
+    const el = feedRef.current;
+    if (!el) return;
+    let raf = 0;
+    const update = () => {
+      const h = el.clientHeight || 1;
+      const idx = Math.max(0, Math.min(feed.length - 1, Math.round(el.scrollTop / h)));
+      setActiveIndex((prev) => (prev === idx ? prev : idx));
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [mounted, feed.length]);
+
+  // 表示回数の計測（アクティブが変わるたびに1回）
+  useEffect(() => {
+    const item = feed[activeIndex];
+    if (!item || countedKeys.current.has(item.key)) return;
+    countedKeys.current.add(item.key);
+    if (item.kind === "ad") trackAdView(item.ad.id);
+    else trackView(item.video.id);
+  }, [activeIndex, feed]);
 
   // 矢印ボタンで前後の動画へ移動（iframe がスワイプを吸収する問題の対策）
   const goTo = (delta: number) => {
@@ -244,7 +253,7 @@ export default function VideoFeed() {
           </p>
         </div>
       ) : (
-        <div className="swipe-feed">
+        <div className="swipe-feed" ref={feedRef}>
           {feed.map((item, i) => (
             <div
               key={item.key}

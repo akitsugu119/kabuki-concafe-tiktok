@@ -113,9 +113,15 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
     return () => window.removeEventListener("message", onMsg);
   }, [applyState]);
 
-  // active / soundOn が変わったら反映
+  // active / soundOn が変わったら反映。読み込みが間に合わない場合に備えて少し遅れて再送。
   useEffect(() => {
-    if (readyRef.current) applyState();
+    applyState();
+    const t1 = setTimeout(() => activeRef.current && applyState(), 400);
+    const t2 = setTimeout(() => activeRef.current && applyState(), 1200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
   }, [active, soundOn, applyState]);
 
   // ---- 表示分岐 ----
