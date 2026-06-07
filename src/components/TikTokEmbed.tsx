@@ -71,11 +71,14 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     w.postMessage(msg, "*");
   }, []);
 
-  // active なら再生、そうでなければ「一時停止」（ミュートはしない）。
-  // 停止すれば音は止まるので前の動画の音は残らず、かつ音アリ状態を保てる。
+  // active なら再生＋音オン、そうでなければ一時停止。
+  // 一度でもページを操作（スワイプ/タップ）した後は、ブラウザが音アリ再生を許可するため、
+  // active 動画へ unMute を送ると 2本目以降も音が続く。
+  // （最初の1本だけは操作前なので、動画内スピーカーのタップが必要）
   const applyState = useCallback(() => {
     if (activeRef.current) {
       post("play");
+      post("unMute");
     } else {
       post("pause");
     }
