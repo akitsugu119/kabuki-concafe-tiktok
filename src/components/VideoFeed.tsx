@@ -23,7 +23,6 @@ export default function VideoFeed() {
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [soundOn, setSoundOn] = useState(false);
 
   const seedRef = useRef(0);
   const fixedShownRef = useRef(false);
@@ -119,20 +118,6 @@ export default function VideoFeed() {
     <>
       <FilterBar value={filter} onChange={setFilter} />
 
-      {/* 音オン/オフ（ブラウザは音アリ自動再生を禁止のため、一度押すと以降スワイプしても音が続く） */}
-      {hasFeed && (
-        <button
-          onClick={() => setSoundOn((s) => !s)}
-          aria-label={soundOn ? "音を消す" : "音を出す"}
-          className={
-            "fixed right-3 top-[calc(env(safe-area-inset-top)+52px)] z-30 flex items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-xs font-bold backdrop-blur-md transition active:scale-95 " +
-            (soundOn ? "bg-black/45 text-white" : "bg-accent-grad text-white shadow-neon")
-          }
-        >
-          {soundOn ? "🔊 音オン" : "🔇 タップで音"}
-        </button>
-      )}
-
       {/* 前へ／次へ ボタン（左中央に縦並び。TikTok操作ボタンや下部ボタンと重ならない位置）。
           iframe がスワイプを吸収して「どこを触れば次に行くか分からない」問題の対策。 */}
       {hasFeed && (
@@ -169,7 +154,7 @@ export default function VideoFeed() {
       {hasFeed && showHint && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+200px)] z-30 flex justify-center px-6">
           <div className="animate-fade-up rounded-full bg-black/70 px-4 py-2 text-xs font-bold text-white backdrop-blur-md">
-上下にスワイプで移動 ／ 右上の「🔇 タップで音」で音が出ます
+上下にスワイプで移動 ／ 動画内の 🔈 を押すと音が出ます
           </div>
         </div>
       )}
@@ -203,7 +188,6 @@ export default function VideoFeed() {
                   item={item}
                   shouldLoad={Math.abs(i - activeIndex) <= 1}
                   active={i === activeIndex}
-                  soundOn={soundOn}
                   onEnded={handleEnded}
                 />
               )}

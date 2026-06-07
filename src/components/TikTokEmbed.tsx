@@ -14,10 +14,8 @@ interface Props {
   url: string;
   /** true のときだけ iframe を読み込む（前後の動画のみ：パフォーマンス対策） */
   shouldLoad: boolean;
-  /** 今まさに画面に出ている動画か（自動再生・音の対象） */
+  /** 今まさに画面に出ている動画か（自動再生の対象） */
   active: boolean;
-  /** 音を出す設定（ユーザーが一度タップした後だけ true にできる） */
-  soundOn: boolean;
   /** 動画が最後まで再生し終わったとき */
   onEnded?: () => void;
 }
@@ -28,7 +26,7 @@ interface Props {
  * - soundOn なら unMute（要・事前のユーザー操作）
  * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）
  */
-export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded }: Props) {
+export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props) {
   const directId = extractTikTokId(url);
   const short = isShortLink(url);
 
@@ -38,10 +36,8 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const activeRef = useRef(active);
-  const soundRef = useRef(soundOn);
   const onEndedRef = useRef(onEnded);
   activeRef.current = active;
-  soundRef.current = soundOn;
   onEndedRef.current = onEnded;
 
   // 短縮URLの解決
@@ -75,11 +71,12 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
     w.postMessage(msg, "*");
   }, []);
 
-  // 現在の active / soundOn に合わせて再生状態を適用
+  // active なら再生、そうでなければ一時停止＋ミュート（前の動画の音が残る問題の対策）
+  // 音アリ再生は、動画内のスピーカー（iframe内のユーザー操作）でのみ可能なため、
+  // ここでは active 動画を強制ミュートしない（ユーザーがオンにした音を維持）。
   const applyState = useCallback(() => {
     if (activeRef.current) {
       post("play");
-      post(soundRef.current ? "unMute" : "mute");
     } else {
       post("pause");
       post("mute");
@@ -113,10 +110,10 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
     return () => window.removeEventListener("message", onMsg);
   }, [applyState]);
 
-  // active / soundOn が変わったら反映
+  // active が変わったら反映
   useEffect(() => {
     if (readyRef.current) applyState();
-  }, [active, soundOn, applyState]);
+  }, [active, applyState]);
 
   // ---- 表示分岐 ----
   if (directId && isPlaceholderId(directId)) return <DemoCard url={url} />;
