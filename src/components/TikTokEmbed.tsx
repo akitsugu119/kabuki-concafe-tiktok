@@ -16,6 +16,8 @@ interface Props {
   shouldLoad: boolean;
   /** 今まさに画面に出ている動画か（自動再生の対象） */
   active: boolean;
+  /** 音を出す設定（PCで有効。一度ページ操作後はアクティブ動画に音オンを送る） */
+  soundOn: boolean;
   /** 動画が最後まで再生し終わったとき */
   onEnded?: () => void;
 }
@@ -26,7 +28,7 @@ interface Props {
  * - soundOn なら unMute（要・事前のユーザー操作）
  * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）
  */
-export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props) {
+export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded }: Props) {
   const directId = extractTikTokId(url);
   const short = isShortLink(url);
 
@@ -36,8 +38,10 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const activeRef = useRef(active);
+  const soundRef = useRef(soundOn);
   const onEndedRef = useRef(onEnded);
   activeRef.current = active;
+  soundRef.current = soundOn;
   onEndedRef.current = onEnded;
 
   // 短縮URLの解決
@@ -71,12 +75,12 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     w.postMessage(msg, "*");
   }, []);
 
-  // active なら再生、そうでなければ一時停止。
-  // 音は「動画内スピーカーの実クリック」でのみ出す（自動unMuteはPCで
-  // “アイコンON・無音”の紛らわしい状態を生むため送らない）。
+  // active なら再生（soundOn のときは音オンも送る＝PCで一度操作後は音が続く）。
+  // 非アクティブは一時停止。soundOff のときは何もせず（ミュート自動再生のまま）。
   const applyState = useCallback(() => {
     if (activeRef.current) {
       post("play");
+      if (soundRef.current) post("unMute");
     } else {
       post("pause");
     }
@@ -109,10 +113,10 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     return () => window.removeEventListener("message", onMsg);
   }, [applyState]);
 
-  // active が変わったら反映
+  // active / soundOn が変わったら反映
   useEffect(() => {
     if (readyRef.current) applyState();
-  }, [active, applyState]);
+  }, [active, soundOn, applyState]);
 
   // ---- 表示分岐 ----
   if (directId && isPlaceholderId(directId)) return <DemoCard url={url} />;

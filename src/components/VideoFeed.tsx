@@ -23,6 +23,7 @@ export default function VideoFeed() {
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [soundOn, setSoundOn] = useState(false);
 
   const seedRef = useRef(0);
   const fixedShownRef = useRef(false);
@@ -131,6 +132,33 @@ export default function VideoFeed() {
   // 動画が終わったら自動で次へ
   const handleEnded = () => goTo(1);
 
+  // 音オン/オフ。クリック（＝ユーザー操作）と同じ流れの中で、
+  // 「画面中央に表示中の」iframeへ直接 play+unMute を送る（PCで確実に音が出る）。
+  const toggleSound = () => {
+    const next = !soundOn;
+    setSoundOn(next);
+    const iframes = Array.from(
+      document.querySelectorAll<HTMLIFrameElement>(".swipe-feed iframe")
+    );
+    const cy = window.innerHeight / 2;
+    let best: HTMLIFrameElement | null = null;
+    let bestDist = Infinity;
+    for (const f of iframes) {
+      const r = f.getBoundingClientRect();
+      const center = r.top + r.height / 2;
+      const dist = Math.abs(center - cy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = f;
+      }
+    }
+    const w = best?.contentWindow;
+    if (w) {
+      w.postMessage({ "x-tiktok-player": true, type: "play" }, "*");
+      w.postMessage({ "x-tiktok-player": true, type: next ? "unMute" : "mute" }, "*");
+    }
+  };
+
   // 操作ヒント（セッションで1回だけ少し見せる）
   const [showHint, setShowHint] = useState(false);
   useEffect(() => {
@@ -147,6 +175,20 @@ export default function VideoFeed() {
   return (
     <>
       <FilterBar value={filter} onChange={setFilter} />
+
+      {/* 音オン/オフ（PCで有効。1回押すと以降の動画も音が続く。スマホは動画内🔈でも可） */}
+      {hasFeed && (
+        <button
+          onClick={toggleSound}
+          aria-label={soundOn ? "音を消す" : "音を出す"}
+          className={
+            "fixed right-3 top-[calc(env(safe-area-inset-top)+52px)] z-30 flex items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-xs font-bold backdrop-blur-md transition active:scale-95 " +
+            (soundOn ? "bg-black/45 text-white" : "bg-accent-grad text-white shadow-neon")
+          }
+        >
+          {soundOn ? "🔊 音オン" : "🔇 音を出す"}
+        </button>
+      )}
 
       {/* 前へ／次へ ボタン（左中央に縦並び。TikTok操作ボタンや下部ボタンと重ならない位置）。
           iframe がスワイプを吸収して「どこを触れば次に行くか分からない」問題の対策。 */}
@@ -184,7 +226,7 @@ export default function VideoFeed() {
       {hasFeed && showHint && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+200px)] z-30 flex justify-center px-6">
           <div className="animate-fade-up rounded-full bg-black/70 px-4 py-2 text-xs font-bold text-white backdrop-blur-md">
-スワイプで動画が流れます ／ 音は動画内の 🔈 を1タップ（iPhoneは動画ごと）
+スワイプで動画が流れます ／ 右上「🔇音を出す」で音オン（スマホは動画内🔈でも）
           </div>
         </div>
       )}
@@ -218,6 +260,7 @@ export default function VideoFeed() {
                   item={item}
                   shouldLoad={Math.abs(i - activeIndex) <= 1}
                   active={i === activeIndex}
+                  soundOn={soundOn}
                   onEnded={handleEnded}
                 />
               )}

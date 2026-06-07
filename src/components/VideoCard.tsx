@@ -8,6 +8,7 @@ interface Props {
   item: VideoFeedItem;
   shouldLoad: boolean;
   active: boolean;
+  soundOn: boolean;
   onEnded?: () => void;
 }
 
@@ -16,7 +17,7 @@ interface Props {
  * - 通常動画：TikTok埋め込み ＋「TikTokで見る」だけ
  * - ピックアップ／固定トップ：今注目バッジ・PR表記・店舗名・店舗公式ボタンも表示
  */
-export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) {
+export default function VideoCard({ item, shouldLoad, active, soundOn, onEnded }: Props) {
   const { video, isFixedTopSlot } = item;
 
   // ピックアップ表示するか（ピックアップ動画 or 固定トップ枠）
@@ -43,6 +44,7 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
           url={video.tiktokUrl}
           shouldLoad={shouldLoad}
           active={active}
+          soundOn={soundOn}
           onEnded={onEnded}
         />
 
