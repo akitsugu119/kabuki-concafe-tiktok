@@ -115,6 +115,8 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
         }
       } else if (d.type === "onCurrentTime") {
         setPlaying(true);
+      } else if (d.type === "onPlayerError") {
+        setStatus("error");
       }
     }
     window.addEventListener("message", onMsg);
@@ -138,11 +140,20 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     setPlaying(false);
   }, [reloadKey]);
 
-  // 黒いまま読み込めない対策：active なのに6秒たっても準備完了しなければ自動で再読み込み（最大2回）
+  // 黒いまま読み込めない対策：active なのに5秒たっても準備完了しなければ自動で再読み込み（最大2回）
   useEffect(() => {
     if (!active || ready || reloadKey >= 2) return;
     const t = setTimeout(() => {
       if (activeRef.current && !readyRef.current) setReloadKey((k) => k + 1);
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [active, ready, reloadKey]);
+
+  // 再読み込みを使い切っても準備できなければ、無限ローディングにせずエラー表示にする
+  useEffect(() => {
+    if (!active || ready || reloadKey < 2) return;
+    const t = setTimeout(() => {
+      if (activeRef.current && !readyRef.current) setStatus("error");
     }, 6000);
     return () => clearTimeout(t);
   }, [active, ready, reloadKey]);
