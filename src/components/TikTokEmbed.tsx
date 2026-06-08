@@ -16,8 +16,6 @@ interface Props {
   shouldLoad: boolean;
   /** 今まさに画面に出ている動画か（自動再生の対象） */
   active: boolean;
-  /** 音を出す設定（PCで有効。一度ページ操作後はアクティブ動画に音オンを送る） */
-  soundOn: boolean;
   /** 動画が最後まで再生し終わったとき */
   onEnded?: () => void;
 }
@@ -28,7 +26,7 @@ interface Props {
  * - soundOn なら unMute（要・事前のユーザー操作）
  * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）
  */
-export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded }: Props) {
+export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props) {
   const directId = extractTikTokId(url);
   const short = isShortLink(url);
 
@@ -38,10 +36,8 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const activeRef = useRef(active);
-  const soundRef = useRef(soundOn);
   const onEndedRef = useRef(onEnded);
   activeRef.current = active;
-  soundRef.current = soundOn;
   onEndedRef.current = onEnded;
 
   // 短縮URLの解決
@@ -80,7 +76,6 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
   const applyState = useCallback(() => {
     if (activeRef.current) {
       post("play");
-      if (soundRef.current) post("unMute");
     } else {
       post("pause");
       post("mute");
@@ -114,7 +109,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
     return () => window.removeEventListener("message", onMsg);
   }, [applyState]);
 
-  // active / soundOn が変わったら反映。読み込みが間に合わない場合に備えて少し遅れて再送。
+  // active が変わったら反映。読み込みが間に合わない場合に備えて少し遅れて再送。
   useEffect(() => {
     applyState();
     const t1 = setTimeout(() => activeRef.current && applyState(), 400);
@@ -123,7 +118,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [active, soundOn, applyState]);
+  }, [active, applyState]);
 
   // ---- 表示分岐 ----
   if (directId && isPlaceholderId(directId)) return <DemoCard url={url} />;
@@ -135,7 +130,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-black">
       <iframe
         ref={iframeRef}
-        src={tiktokPlayerUrl(resolvedId, !soundOn)}
+        src={tiktokPlayerUrl(resolvedId)}
         title="TikTok 動画"
         loading="lazy"
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"

@@ -23,7 +23,6 @@ export default function VideoFeed() {
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [soundOn, setSoundOn] = useState(false);
 
   const seedRef = useRef(0);
   const fixedShownRef = useRef(false);
@@ -141,9 +140,6 @@ export default function VideoFeed() {
   // 動画が終わったら自動で次へ
   const handleEnded = () => goTo(1);
 
-  // 音オン/オフ。soundOn を切り替えると、表示中の動画iframeが muted=0 で読み直され、
-  // ユーザー操作後（sticky activation）なので音アリで再生される。
-  const toggleSound = () => setSoundOn((s) => !s);
 
   // 操作ヒント（セッションで1回だけ少し見せる）
   const [showHint, setShowHint] = useState(false);
@@ -161,20 +157,6 @@ export default function VideoFeed() {
   return (
     <>
       <FilterBar value={filter} onChange={setFilter} />
-
-      {/* 音オン/オフ（PCで有効。1回押すと以降の動画も音が続く。スマホは動画内🔈でも可） */}
-      {hasFeed && (
-        <button
-          onClick={toggleSound}
-          aria-label={soundOn ? "音を消す" : "音を出す"}
-          className={
-            "fixed right-3 top-[calc(env(safe-area-inset-top)+52px)] z-30 flex items-center gap-1 rounded-full border border-white/15 px-3 py-2 text-xs font-bold backdrop-blur-md transition active:scale-95 " +
-            (soundOn ? "bg-black/45 text-white" : "bg-accent-grad text-white shadow-neon")
-          }
-        >
-          {soundOn ? "🔊 音オン" : "🔇 音を出す"}
-        </button>
-      )}
 
       {/* 前へ／次へ ボタン（左中央に縦並び。TikTok操作ボタンや下部ボタンと重ならない位置）。
           iframe がスワイプを吸収して「どこを触れば次に行くか分からない」問題の対策。 */}
@@ -212,7 +194,7 @@ export default function VideoFeed() {
       {hasFeed && showHint && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+200px)] z-30 flex justify-center px-6">
           <div className="animate-fade-up rounded-full bg-black/70 px-4 py-2 text-xs font-bold text-white backdrop-blur-md">
-スワイプで動画が流れます ／ 右上「🔇音を出す」で音オン（スマホは動画内🔈でも）
+スワイプで動画が自動再生 ／ 音は動画内の 🔈 をタップ
           </div>
         </div>
       )}
@@ -246,7 +228,6 @@ export default function VideoFeed() {
                   item={item}
                   shouldLoad={Math.abs(i - activeIndex) <= 1}
                   active={i === activeIndex}
-                  soundOn={soundOn}
                   onEnded={handleEnded}
                 />
               )}
