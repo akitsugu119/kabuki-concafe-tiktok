@@ -168,10 +168,10 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     return () => clearTimeout(t);
   }, [active, playing, ready]);
 
-  // タップで確実に再生＋音オン（ユーザー操作なのでブラウザが許可する）
+  // タップで再生を開始（音は出さない＝親からのunMuteは“アイコンON・無音”になり紛らわしいため）。
+  // 音は再生後に動画内の🔈を直接クリックして出す。
   const onTapPlay = useCallback(() => {
     post("play");
-    post("unMute");
     setShowTap(false);
   }, [post]);
 
