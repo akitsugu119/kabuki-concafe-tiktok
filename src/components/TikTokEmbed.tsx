@@ -140,21 +140,21 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     setPlaying(false);
   }, [reloadKey]);
 
-  // 黒いまま読み込めない対策：active なのに5秒たっても準備完了しなければ自動で再読み込み（最大2回）
+  // 黒いまま読み込めない対策：active なのに5秒たっても準備完了しなければ自動で再読み込み（1回だけ）
   useEffect(() => {
-    if (!active || ready || reloadKey >= 2) return;
+    if (!active || ready || reloadKey >= 1) return;
     const t = setTimeout(() => {
       if (activeRef.current && !readyRef.current) setReloadKey((k) => k + 1);
     }, 5000);
     return () => clearTimeout(t);
   }, [active, ready, reloadKey]);
 
-  // 再読み込みを使い切っても準備できなければ、無限ローディングにせずエラー表示にする
+  // 再読み込みしても準備できなければ、無限ローディングにせずエラー表示にする（合計約10秒）
   useEffect(() => {
-    if (!active || ready || reloadKey < 2) return;
+    if (!active || ready || reloadKey < 1) return;
     const t = setTimeout(() => {
       if (activeRef.current && !readyRef.current) setStatus("error");
-    }, 6000);
+    }, 5000);
     return () => clearTimeout(t);
   }, [active, ready, reloadKey]);
 
@@ -235,6 +235,7 @@ function ErrorCard() {
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl bg-ink-800 px-6 text-center">
       <div className="text-3xl">🥀</div>
       <p className="text-sm text-white/70">この動画は現在表示できません</p>
+      <p className="text-xs text-white/40">↑ 上にスワイプで次の動画へ</p>
     </div>
   );
 }
