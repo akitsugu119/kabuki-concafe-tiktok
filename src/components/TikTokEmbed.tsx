@@ -83,6 +83,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
       if (soundRef.current) post("unMute");
     } else {
       post("pause");
+      post("mute");
     }
   }, [post]);
 
@@ -134,7 +135,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOn, onEnded 
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-black">
       <iframe
         ref={iframeRef}
-        src={tiktokPlayerUrl(resolvedId)}
+        src={tiktokPlayerUrl(resolvedId, !soundOn)}
         title="TikTok 動画"
         loading="lazy"
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"

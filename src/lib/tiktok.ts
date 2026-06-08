@@ -28,12 +28,12 @@ export function tiktokEmbedUrl(videoId: string): string {
  * postMessage で play/pause/mute/unMute を制御でき、終了イベントも取れる。
  * autoplay=1&muted=1 でミュート自動再生（ブラウザは音アリ自動再生を禁止のため）。
  */
-export function tiktokPlayerUrl(videoId: string): string {
+export function tiktokPlayerUrl(videoId: string, muted = true): string {
+  // muted=true：確実に自動再生（既定）。
+  // muted=false：音オン時に使用。ユーザー操作後（sticky activation）なら音アリ自動再生が通る。
   const params = new URLSearchParams({
     autoplay: "1",
-    // muted=1：ミュートなら全端末で確実に自動再生される（音アリ自動再生はブラウザが禁止）。
-    // 音は「音を出す」ボタン（ユーザー操作）で active 動画へ unMute して出す。
-    muted: "1",
+    muted: muted ? "1" : "0",
     controls: "1",
     progress_bar: "0",
     timestamp: "0",

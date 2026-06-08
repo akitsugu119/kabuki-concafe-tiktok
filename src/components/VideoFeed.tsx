@@ -141,32 +141,9 @@ export default function VideoFeed() {
   // 動画が終わったら自動で次へ
   const handleEnded = () => goTo(1);
 
-  // 音オン/オフ。クリック（＝ユーザー操作）と同じ流れの中で、
-  // 「画面中央に表示中の」iframeへ直接 play+unMute を送る（PCで確実に音が出る）。
-  const toggleSound = () => {
-    const next = !soundOn;
-    setSoundOn(next);
-    const iframes = Array.from(
-      document.querySelectorAll<HTMLIFrameElement>(".swipe-feed iframe")
-    );
-    const cy = window.innerHeight / 2;
-    let best: HTMLIFrameElement | null = null;
-    let bestDist = Infinity;
-    for (const f of iframes) {
-      const r = f.getBoundingClientRect();
-      const center = r.top + r.height / 2;
-      const dist = Math.abs(center - cy);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = f;
-      }
-    }
-    const w = best?.contentWindow;
-    if (w) {
-      w.postMessage({ "x-tiktok-player": true, type: "play" }, "*");
-      w.postMessage({ "x-tiktok-player": true, type: next ? "unMute" : "mute" }, "*");
-    }
-  };
+  // 音オン/オフ。soundOn を切り替えると、表示中の動画iframeが muted=0 で読み直され、
+  // ユーザー操作後（sticky activation）なので音アリで再生される。
+  const toggleSound = () => setSoundOn((s) => !s);
 
   // 操作ヒント（セッションで1回だけ少し見せる）
   const [showHint, setShowHint] = useState(false);
