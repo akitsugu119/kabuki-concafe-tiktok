@@ -59,7 +59,7 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
       {/* 動画本体（中央・縦長カラム） */}
       <div className="relative h-[78dvh] w-full max-w-[460px]">
         {opened ? (
-          <TikTokEmbed url={video.tiktokUrl} shouldLoad active={active} onEnded={onEnded} />
+          <TikTokEmbed url={video.tiktokUrl} shouldLoad active={active} soundOnOpen onEnded={onEnded} />
         ) : (
           <button
             onClick={(e) => {
@@ -90,7 +90,7 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </span>
-              <span className="text-sm font-bold text-white">タップで再生</span>
+              <span className="text-sm font-bold text-white">タップで再生（音あり）</span>
               {handle && <span className="text-xs text-white/70">@{handle}</span>}
             </div>
           </button>

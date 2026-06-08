@@ -16,6 +16,8 @@ interface Props {
   shouldLoad: boolean;
   /** 今まさに画面に出ている動画か（自動再生の対象） */
   active: boolean;
+  /** ユーザーのタップで開かれた＝音アリで再生してよい（タップ直後はブラウザが音アリ再生を許可） */
+  soundOnOpen?: boolean;
   /** 動画が最後まで再生し終わったとき */
   onEnded?: () => void;
 }
@@ -26,7 +28,7 @@ interface Props {
  * - soundOn なら unMute（要・事前のユーザー操作）
  * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）
  */
-export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props) {
+export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEnded }: Props) {
   const directId = extractTikTokId(url);
   const short = isShortLink(url);
 
@@ -40,9 +42,11 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const activeRef = useRef(active);
+  const wantSoundRef = useRef(!!soundOnOpen);
   const onEndedRef = useRef(onEnded);
   readyRef.current = ready;
   activeRef.current = active;
+  wantSoundRef.current = !!soundOnOpen;
   onEndedRef.current = onEnded;
 
   // 短縮URLの解決
@@ -81,6 +85,8 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
   const applyState = useCallback(() => {
     if (activeRef.current) {
       post("play");
+      // タップで開いた動画は音アリで（タップ直後の許可が残っているうちに unMute）
+      if (wantSoundRef.current) post("unMute");
     } else {
       post("pause");
       post("mute");
@@ -168,10 +174,10 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     return () => clearTimeout(t);
   }, [active, playing, ready]);
 
-  // タップで再生を開始（音は出さない＝親からのunMuteは“アイコンON・無音”になり紛らわしいため）。
-  // 音は再生後に動画内の🔈を直接クリックして出す。
+  // タップで再生を開始。これ自体がユーザー操作なので音アリで開始を試みる。
   const onTapPlay = useCallback(() => {
     post("play");
+    post("unMute");
     setShowTap(false);
   }, [post]);
 
@@ -211,7 +217,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
             </svg>
           </span>
           <span className="text-sm font-bold text-white">タップで再生</span>
-          <span className="text-[11px] text-white/70">▶ 後、動画内の 🔈 で音が出ます</span>
+          <span className="text-[11px] text-white/70">タップで音アリ再生します</span>
         </button>
       )}
     </div>
