@@ -175,7 +175,8 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
               <path d="M8 5v14l11-7z" />
             </svg>
           </span>
-          <span className="text-sm font-bold text-white">タップで再生（音あり）</span>
+          <span className="text-sm font-bold text-white">タップで再生</span>
+          <span className="text-[11px] text-white/70">▶ 後、動画内の 🔈 で音が出ます</span>
         </button>
       )}
     </div>
