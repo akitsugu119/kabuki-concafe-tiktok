@@ -14,10 +14,10 @@ interface Props {
 }
 
 /**
- * ハイブリッド型（1画面1動画）。
- * - 既定はサムネ表示（埋め込みを読み込まない＝同時読み込み/制限を回避）
- * - タップすると埋め込みプレーヤーを読み込んで再生（タップ＝ユーザー操作で音も出やすい）
- * - ピックアップ／固定トップは今注目バッジ・店舗情報も表示
+ * 1画面1動画。
+ * - 近く(active±1)は本物の TikTok プレーヤーを読み込み、遠くはサムネのみ（負荷軽減）。
+ * - 自動再生はしない。プレーヤーの再生ボタンをタップ＝音アリで再生（クロスオリジン埋め込みの制約のため、
+ *   これが「1タップで動画＋音」を実現できる唯一の確実な方法）。
  */
 export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) {
   const { video, isFixedTopSlot } = item;
@@ -26,13 +26,12 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
   const showPr = isFixedTopSlot ? true : video.showPrLabel;
   const hasShop = !!video.shopOfficialUrl;
 
-  const [opened, setOpened] = useState(false);
   const [thumb, setThumb] = useState<string | null>(null);
   const [handle, setHandle] = useState<string | null>(extractHandle(video.tiktokUrl));
 
   // プレビュー用サムネを解決（近くにある時だけ。埋め込みより軽い）
   useEffect(() => {
-    if (opened || !shouldLoad || thumb) return;
+    if (!shouldLoad || thumb) return;
     let cancelled = false;
     resolveShortLink(video.tiktokUrl).then((r) => {
       if (cancelled || !r) return;
@@ -42,7 +41,7 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
     return () => {
       cancelled = true;
     };
-  }, [opened, shouldLoad, thumb, video.tiktokUrl]);
+  }, [shouldLoad, thumb, video.tiktokUrl]);
 
   const onTikTok = () => {
     trackTiktokClick(video.id);
@@ -58,47 +57,49 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
     <section className="swipe-page relative flex items-center justify-center px-3">
       {/* 動画本体（中央・縦長カラム） */}
       <div className="relative h-[78dvh] w-full max-w-[460px]">
-        {opened ? (
-          <TikTokEmbed url={video.tiktokUrl} shouldLoad active={active} soundOnOpen onEnded={onEnded} />
-        ) : (
-          <button
-            onClick={(e) => {
-              // タップしたカードを画面に合わせる（＝アクティブ化して確実に再生される）
-              e.currentTarget.closest(".swipe-page")?.scrollIntoView();
-              setOpened(true);
-            }}
-            aria-label="タップで再生"
-            className="relative block h-full w-full overflow-hidden rounded-2xl bg-ink-800"
-          >
-            {thumb ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={"/api/thumb?url=" + encodeURIComponent(thumb)}
-                alt={handle || "動画"}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="pointer-events-none absolute inset-0 opacity-70">
-                <div className="absolute -left-16 top-10 h-56 w-56 rounded-full bg-neon-pink/30 blur-3xl" />
-                <div className="absolute -right-10 bottom-16 h-56 w-56 rounded-full bg-neon-purple/30 blur-3xl" />
-              </div>
-            )}
-            {/* 再生ボタン＋案内 */}
+        {/* サムネ（ポスター）。プレーヤー読み込み中の下地＆遠いカードの軽量プレビュー */}
+        <div className="absolute inset-0 overflow-hidden rounded-2xl bg-ink-800">
+          {thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={"/api/thumb?url=" + encodeURIComponent(thumb)}
+              alt={handle || "動画"}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="pointer-events-none absolute inset-0 opacity-70">
+              <div className="absolute -left-16 top-10 h-56 w-56 rounded-full bg-neon-pink/30 blur-3xl" />
+              <div className="absolute -right-10 bottom-16 h-56 w-56 rounded-full bg-neon-purple/30 blur-3xl" />
+            </div>
+          )}
+          {/* プレーヤー未読み込み（遠いカード）には再生アイコンと@を表示 */}
+          {!shouldLoad && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30">
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-grad shadow-neon">
                 <svg viewBox="0 0 24 24" className="h-7 w-7 fill-white">
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </span>
-              <span className="text-sm font-bold text-white">タップで再生（音あり）</span>
               {handle && <span className="text-xs text-white/70">@{handle}</span>}
             </div>
-          </button>
+          )}
+        </div>
+
+        {/* 近く：本物のプレーヤーを重ねる。中央/左下の再生ボタンをタップ＝音アリで再生 */}
+        {shouldLoad && (
+          <div className="absolute inset-0">
+            <TikTokEmbed
+              url={video.tiktokUrl}
+              shouldLoad={shouldLoad}
+              active={active}
+              onEnded={onEnded}
+            />
+          </div>
         )}
 
         {/* 上部：バッジ（ピックアップ／固定トップのみ） */}
         {showPickupUI && (
-          <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2">
+          <div className="pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-2">
             <span className="badge-pickup">
               <span aria-hidden>✦</span>
               {video.badgeLabel || "今注目"}

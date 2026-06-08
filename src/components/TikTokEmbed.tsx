@@ -12,41 +12,37 @@ import {
 
 interface Props {
   url: string;
-  /** true のときだけ iframe を読み込む（前後の動画のみ：パフォーマンス対策） */
+  /** true のときだけ iframe を読み込む（前後の動画：先読み） */
   shouldLoad: boolean;
-  /** 今まさに画面に出ている動画か（自動再生の対象） */
+  /** 今まさに画面に出ている動画か */
   active: boolean;
-  /** ユーザーのタップで開かれた＝音アリで再生してよい（タップ直後はブラウザが音アリ再生を許可） */
-  soundOnOpen?: boolean;
-  /** 動画が最後まで再生し終わったとき */
+  /** 再生が最後まで終わったとき */
   onEnded?: () => void;
 }
 
 /**
  * TikTok 公式プレーヤー（player/v1）。
- * - active のものだけ再生、それ以外は一時停止＋ミュート（前の音が残る問題の対策）
- * - soundOn なら unMute（要・事前のユーザー操作）
- * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）
+ * - 自動再生はしない。ユーザーがプレーヤー内の再生ボタンを押すと「音アリ」で再生される。
+ *   （クロスオリジンの埋め込みでは、音アリ再生は iframe 内の操作でのみブラウザが許可するため、
+ *    親側からの unMute は無音になる。だから“ネイティブの再生ボタンを直接タップ”が最短。）
+ * - 非アクティブは pause+mute（前の動画の音が残らないように）。
+ * - 再生終了(onStateChange=0)で onEnded を呼ぶ（自動で次へ）。
  */
-export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEnded }: Props) {
+export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props) {
   const directId = extractTikTokId(url);
   const short = isShortLink(url);
 
   const [resolvedId, setResolvedId] = useState<string | null>(directId);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [playing, setPlaying] = useState(false);
-  const [showTap, setShowTap] = useState(false);
   const [ready, setReady] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const activeRef = useRef(active);
-  const wantSoundRef = useRef(!!soundOnOpen);
   const onEndedRef = useRef(onEnded);
   readyRef.current = ready;
   activeRef.current = active;
-  wantSoundRef.current = !!soundOnOpen;
   onEndedRef.current = onEnded;
 
   // 短縮URLの解決
@@ -70,24 +66,15 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEn
   }, [url, short, directId, resolvedId, shouldLoad]);
 
   // プレーヤーへコマンド送信
-  const post = useCallback((type: string, value?: number) => {
+  const post = useCallback((type: string) => {
     const w = iframeRef.current?.contentWindow;
     if (!w) return;
-    const msg =
-      value === undefined
-        ? { "x-tiktok-player": true, type }
-        : { "x-tiktok-player": true, type, value };
-    w.postMessage(msg, "*");
+    w.postMessage({ "x-tiktok-player": true, type }, "*");
   }, []);
 
-  // active なら再生（soundOn のときは音オンも送る＝PCで一度操作後は音が続く）。
-  // 非アクティブは一時停止。soundOff のときは何もせず（ミュート自動再生のまま）。
+  // 非アクティブは停止＋ミュート。アクティブは何もしない（ユーザー操作で音アリ再生させる）。
   const applyState = useCallback(() => {
-    if (activeRef.current) {
-      post("play");
-      // タップで開いた動画は音アリで（タップ直後の許可が残っているうちに unMute）
-      if (wantSoundRef.current) post("unMute");
-    } else {
+    if (!activeRef.current) {
       post("pause");
       post("mute");
     }
@@ -112,15 +99,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEn
         setReady(true);
         applyState();
       } else if (d.type === "onStateChange") {
-        if (d.value === 1) setPlaying(true); // playing
-        else if (d.value === 2) setPlaying(false); // paused
-        else if (d.value === 0) {
-          // ended
-          setPlaying(false);
-          if (activeRef.current) onEndedRef.current?.();
-        }
-      } else if (d.type === "onCurrentTime") {
-        setPlaying(true);
+        if (d.value === 0 && activeRef.current) onEndedRef.current?.(); // ended → 次へ
       } else if (d.type === "onPlayerError") {
         setStatus("error");
       }
@@ -129,24 +108,23 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEn
     return () => window.removeEventListener("message", onMsg);
   }, [applyState]);
 
-  // active が変わったら反映。読み込みが間に合わない場合に備えて少し遅れて再送。
+  // active 変化を反映（非アクティブの停止・ミュートを確実に。読み込み遅延に備え再送）
   useEffect(() => {
     applyState();
-    const t1 = setTimeout(() => activeRef.current && applyState(), 400);
-    const t2 = setTimeout(() => activeRef.current && applyState(), 1200);
+    const t1 = setTimeout(applyState, 400);
+    const t2 = setTimeout(applyState, 1200);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
   }, [active, applyState]);
 
-  // iframe再読み込み時は準備状態をリセット
+  // 再読み込み時は準備状態をリセット
   useEffect(() => {
     setReady(false);
-    setPlaying(false);
   }, [reloadKey]);
 
-  // 黒いまま読み込めない対策：active なのに5秒たっても準備完了しなければ自動で再読み込み（1回だけ）
+  // 黒いまま読み込めない対策：active なのに5秒たっても準備完了しなければ自動再読み込み（1回）
   useEffect(() => {
     if (!active || ready || reloadKey >= 1) return;
     const t = setTimeout(() => {
@@ -155,7 +133,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEn
     return () => clearTimeout(t);
   }, [active, ready, reloadKey]);
 
-  // 再読み込みしても準備できなければ、無限ローディングにせずエラー表示にする（合計約10秒）
+  // 再読み込みしても準備できなければエラー表示にする（無限ローディング回避）
   useEffect(() => {
     if (!active || ready || reloadKey < 1) return;
     const t = setTimeout(() => {
@@ -163,23 +141,6 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEn
     }, 5000);
     return () => clearTimeout(t);
   }, [active, ready, reloadKey]);
-
-  // 自動再生されない端末向け：準備完了しているのに再生されなければ「タップで再生」を出す
-  useEffect(() => {
-    if (!active || playing || !ready) {
-      setShowTap(false);
-      return;
-    }
-    const t = setTimeout(() => setShowTap(true), 1500);
-    return () => clearTimeout(t);
-  }, [active, playing, ready]);
-
-  // タップで再生を開始。これ自体がユーザー操作なので音アリで開始を試みる。
-  const onTapPlay = useCallback(() => {
-    post("play");
-    post("unMute");
-    setShowTap(false);
-  }, [post]);
 
   // ---- 表示分岐 ----
   if (directId && isPlaceholderId(directId)) return <DemoCard url={url} />;
@@ -200,25 +161,11 @@ export default function TikTokEmbed({ url, shouldLoad, active, soundOnOpen, onEn
         onError={() => setStatus("error")}
         className="h-full w-full border-0"
       />
+      {/* 読み込み中だけスピナー（pointer-events-none で下のプレーヤー操作を邪魔しない） */}
       {!ready && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink-800">
           <div className="h-10 w-10 animate-pulse rounded-full bg-accent-grad opacity-70" />
         </div>
-      )}
-      {showTap && (
-        <button
-          onClick={onTapPlay}
-          aria-label="タップで再生"
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/45"
-        >
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-grad shadow-neon">
-            <svg viewBox="0 0 24 24" className="h-7 w-7 fill-white">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-          <span className="text-sm font-bold text-white">タップで再生</span>
-          <span className="text-[11px] text-white/70">タップで音アリ再生します</span>
-        </button>
       )}
     </div>
   );
