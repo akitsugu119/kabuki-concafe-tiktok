@@ -34,11 +34,14 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [playing, setPlaying] = useState(false);
   const [showTap, setShowTap] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
   const activeRef = useRef(active);
   const onEndedRef = useRef(onEnded);
+  readyRef.current = ready;
   activeRef.current = active;
   onEndedRef.current = onEnded;
 
@@ -100,7 +103,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
       if (!data || typeof data !== "object") return;
       const d = data as { type?: string; value?: number };
       if (d.type === "onPlayerReady") {
-        readyRef.current = true;
+        setReady(true);
         applyState();
       } else if (d.type === "onStateChange") {
         if (d.value === 1) setPlaying(true); // playing
@@ -129,15 +132,30 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
     };
   }, [active, applyState]);
 
-  // 自動再生されない端末向け：active なのに一定時間 再生されなければ「タップで再生」を出す
+  // iframe再読み込み時は準備状態をリセット
   useEffect(() => {
-    if (!active || playing) {
+    setReady(false);
+    setPlaying(false);
+  }, [reloadKey]);
+
+  // 黒いまま読み込めない対策：active なのに6秒たっても準備完了しなければ自動で再読み込み（最大2回）
+  useEffect(() => {
+    if (!active || ready || reloadKey >= 2) return;
+    const t = setTimeout(() => {
+      if (activeRef.current && !readyRef.current) setReloadKey((k) => k + 1);
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [active, ready, reloadKey]);
+
+  // 自動再生されない端末向け：準備完了しているのに再生されなければ「タップで再生」を出す
+  useEffect(() => {
+    if (!active || playing || !ready) {
       setShowTap(false);
       return;
     }
-    const t = setTimeout(() => setShowTap(true), 1800);
+    const t = setTimeout(() => setShowTap(true), 1500);
     return () => clearTimeout(t);
-  }, [active, playing]);
+  }, [active, playing, ready]);
 
   // タップで確実に再生＋音オン（ユーザー操作なのでブラウザが許可する）
   const onTapPlay = useCallback(() => {
@@ -155,6 +173,7 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
   return (
     <div className="relative h-full w-full overflow-hidden rounded-2xl bg-black">
       <iframe
+        key={reloadKey}
         ref={iframeRef}
         src={tiktokPlayerUrl(resolvedId)}
         title="TikTok 動画"
@@ -164,6 +183,11 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
         onError={() => setStatus("error")}
         className="h-full w-full border-0"
       />
+      {!ready && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink-800">
+          <div className="h-10 w-10 animate-pulse rounded-full bg-accent-grad opacity-70" />
+        </div>
+      )}
       {showTap && (
         <button
           onClick={onTapPlay}
