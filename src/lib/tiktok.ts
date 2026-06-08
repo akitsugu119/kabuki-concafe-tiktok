@@ -33,7 +33,8 @@ export function tiktokPlayerUrl(videoId: string, muted = true): string {
   // muted=false：音オン時に使用。ユーザー操作後（sticky activation）なら音アリ自動再生が通る。
   const params = new URLSearchParams({
     autoplay: "1",
-    muted: muted ? "1" : "0",
+    // muted=0：音を出せる状態。自動再生されない動画は「タップで再生」でplay+unMute→音が定着する
+    muted: "0",
     controls: "1",
     progress_bar: "0",
     timestamp: "0",
