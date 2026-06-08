@@ -32,6 +32,8 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
 
   const [resolvedId, setResolvedId] = useState<string | null>(directId);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [playing, setPlaying] = useState(false);
+  const [showTap, setShowTap] = useState(false);
 
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const readyRef = useRef(false);
@@ -100,9 +102,16 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
       if (d.type === "onPlayerReady") {
         readyRef.current = true;
         applyState();
-      } else if (d.type === "onStateChange" && d.value === 0) {
-        // 0 = ended
-        if (activeRef.current) onEndedRef.current?.();
+      } else if (d.type === "onStateChange") {
+        if (d.value === 1) setPlaying(true); // playing
+        else if (d.value === 2) setPlaying(false); // paused
+        else if (d.value === 0) {
+          // ended
+          setPlaying(false);
+          if (activeRef.current) onEndedRef.current?.();
+        }
+      } else if (d.type === "onCurrentTime") {
+        setPlaying(true);
       }
     }
     window.addEventListener("message", onMsg);
@@ -119,6 +128,23 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
       clearTimeout(t2);
     };
   }, [active, applyState]);
+
+  // 自動再生されない端末向け：active なのに一定時間 再生されなければ「タップで再生」を出す
+  useEffect(() => {
+    if (!active || playing) {
+      setShowTap(false);
+      return;
+    }
+    const t = setTimeout(() => setShowTap(true), 1800);
+    return () => clearTimeout(t);
+  }, [active, playing]);
+
+  // タップで確実に再生＋音オン（ユーザー操作なのでブラウザが許可する）
+  const onTapPlay = useCallback(() => {
+    post("play");
+    post("unMute");
+    setShowTap(false);
+  }, [post]);
 
   // ---- 表示分岐 ----
   if (directId && isPlaceholderId(directId)) return <DemoCard url={url} />;
@@ -138,6 +164,20 @@ export default function TikTokEmbed({ url, shouldLoad, active, onEnded }: Props)
         onError={() => setStatus("error")}
         className="h-full w-full border-0"
       />
+      {showTap && (
+        <button
+          onClick={onTapPlay}
+          aria-label="タップで再生"
+          className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/45"
+        >
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-grad shadow-neon">
+            <svg viewBox="0 0 24 24" className="h-7 w-7 fill-white">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+          <span className="text-sm font-bold text-white">タップで再生（音あり）</span>
+        </button>
+      )}
     </div>
   );
 }
