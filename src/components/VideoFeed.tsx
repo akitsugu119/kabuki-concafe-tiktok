@@ -29,6 +29,9 @@ export default function VideoFeed() {
   const countedKeys = useRef<Set<string>>(new Set());
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
   const feedRef = useRef<HTMLDivElement | null>(null);
+  // ボタン操作中はスクロール検知を一時停止（スムーズスクロール中の誤判定で戻る/飛ぶのを防ぐ）。
+  // target に到着するか期限切れまでスクロール検知を無視する。
+  const navLockRef = useRef<{ until: number; target: number | null }>({ until: 0, target: null });
 
   // セッションごとのシード＆固定トップ表示済みフラグを初期化
   useEffect(() => {
@@ -106,6 +109,12 @@ export default function VideoFeed() {
     let raf = 0;
     const update = () => {
       const h = el.clientHeight || 1;
+      const lock = navLockRef.current;
+      if (lock.target !== null) {
+        const arrived = Math.abs(el.scrollTop - lock.target * h) < 6;
+        if (!arrived && Date.now() < lock.until) return; // 移動中は検知しない
+        navLockRef.current = { until: 0, target: null };
+      }
       const idx = Math.max(0, Math.min(feed.length - 1, Math.round(el.scrollTop / h)));
       setActiveIndex((prev) => (prev === idx ? prev : idx));
     };
@@ -133,8 +142,19 @@ export default function VideoFeed() {
   // 矢印ボタンで前後の動画へ移動（iframe がスワイプを吸収する問題の対策）
   const goTo = (delta: number) => {
     const next = Math.min(feed.length - 1, Math.max(0, activeIndex + delta));
+    navLockRef.current = { until: Date.now() + 2000, target: next }; // 到着まで検知を止める
     pageRefs.current[next]?.scrollIntoView({ behavior: "smooth" });
     setActiveIndex(next);
+    // スムーズスクロールが途中で止まった場合の保険：未到着なら強制ジャンプ
+    window.setTimeout(() => {
+      const el = feedRef.current;
+      const target = navLockRef.current.target;
+      if (!el || target === null) return;
+      const h = el.clientHeight || 1;
+      if (Math.abs(el.scrollTop - target * h) >= 6)
+        el.scrollTo({ top: target * h, behavior: "instant" as ScrollBehavior });
+      navLockRef.current = { until: 0, target: null };
+    }, 900);
   };
 
   // 動画が終わったら自動で次へ
@@ -161,14 +181,14 @@ export default function VideoFeed() {
       {/* 前へ／次へ ボタン（左中央に縦並び。TikTok操作ボタンや下部ボタンと重ならない位置）。
           iframe がスワイプを吸収して「どこを触れば次に行くか分からない」問題の対策。 */}
       {hasFeed && (
-        <div className="pointer-events-none fixed left-3 top-1/2 z-30 flex -translate-y-1/2 flex-col gap-3">
+        <div className="pointer-events-none fixed right-3 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-4">
           <button
             aria-label="前の動画"
             onClick={() => goTo(-1)}
             disabled={activeIndex <= 0}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition active:scale-90 disabled:opacity-25"
+            className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-md transition active:scale-90 disabled:opacity-20"
           >
-            <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-white" fill="none" strokeWidth="2.5">
+            <svg viewBox="0 0 24 24" className="h-6 w-6 stroke-white" fill="none" strokeWidth="2.5">
               <path d="M6 15l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
@@ -176,16 +196,21 @@ export default function VideoFeed() {
             aria-label="次の動画"
             onClick={() => goTo(1)}
             disabled={activeIndex >= feed.length - 1}
-            className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full bg-accent-grad text-white shadow-neon transition active:scale-90 disabled:opacity-25"
+            className="pointer-events-auto flex flex-col items-center gap-1 disabled:opacity-20"
           >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5 animate-nudge-y stroke-white"
-              fill="none"
-              strokeWidth="2.5"
-            >
-              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-grad text-white shadow-neon transition active:scale-90">
+              <svg
+                viewBox="0 0 24 24"
+                className="h-8 w-8 animate-nudge-y stroke-white"
+                fill="none"
+                strokeWidth="2.5"
+              >
+                <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur-md">
+              次へ
+            </span>
           </button>
         </div>
       )}
@@ -194,7 +219,7 @@ export default function VideoFeed() {
       {hasFeed && showHint && (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+200px)] z-30 flex justify-center px-6">
           <div className="animate-fade-up rounded-full bg-black/70 px-4 py-2 text-xs font-bold text-white backdrop-blur-md">
-▶ をタップで再生＋音が出ます ／ 上下スワイプで次へ
+動画を ▶ タップで再生＋音 ／ 右の「次へ」で切替
           </div>
         </div>
       )}

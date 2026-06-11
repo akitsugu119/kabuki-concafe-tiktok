@@ -72,8 +72,8 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
               <div className="absolute -right-10 bottom-16 h-56 w-56 rounded-full bg-neon-purple/30 blur-3xl" />
             </div>
           )}
-          {/* プレーヤー未読み込み（遠いカード）には再生アイコンと@を表示 */}
-          {!shouldLoad && (
+          {/* 非アクティブのカードには再生アイコンと@を表示（タップ可能な動画プレビュー） */}
+          {!active && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30">
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-grad shadow-neon">
                 <svg viewBox="0 0 24 24" className="h-7 w-7 fill-white">
@@ -85,12 +85,13 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
           )}
         </div>
 
-        {/* 近く：本物のプレーヤーを重ねる。中央/左下の再生ボタンをタップ＝音アリで再生 */}
-        {shouldLoad && (
+        {/* 表示中の動画だけ本物のプレーヤーを読み込む（同時読み込みは1本＝「3本目で止まる」対策）。
+            中央/左下の再生ボタンをタップ＝音アリで再生 */}
+        {active && (
           <div className="absolute inset-0">
             <TikTokEmbed
               url={video.tiktokUrl}
-              shouldLoad={shouldLoad}
+              shouldLoad
               active={active}
               onEnded={onEnded}
             />
