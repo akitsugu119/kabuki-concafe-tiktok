@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { adminLogout } from "@/components/admin/AdminGate";
 import AdsManager from "@/components/admin/AdsManager";
+import VideoPreviewThumb from "@/components/admin/VideoPreviewThumb";
 import {
   getPublishRequests,
   getVideos,
@@ -88,12 +89,16 @@ function VideosTab({ videos, onChange }: { videos: Video[]; onChange: () => void
           className="rounded-2xl border border-white/10 bg-ink-700/40 p-4"
         >
           <div className="mb-3 flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold">
-                {v.shopName || (extractHandle(v.tiktokUrl) ? "@" + extractHandle(v.tiktokUrl) : "（店舗名なし）")}
-              </p>
-              <p className="truncate text-[11px] text-white/40">{v.tiktokUrl}</p>
-              {v.adminMemo && <p className="mt-1 text-[11px] text-neon-violet">📝 {v.adminMemo}</p>}
+            <div className="flex min-w-0 items-start gap-3">
+              {/* サムネ：クリックでその場プレビュー再生 */}
+              <VideoPreviewThumb url={v.tiktokUrl} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold">
+                  {v.shopName || (extractHandle(v.tiktokUrl) ? "@" + extractHandle(v.tiktokUrl) : "（店舗名なし）")}
+                </p>
+                <p className="truncate text-[11px] text-white/40">{v.tiktokUrl}</p>
+                {v.adminMemo && <p className="mt-1 text-[11px] text-neon-violet">📝 {v.adminMemo}</p>}
+              </div>
             </div>
             <Link
               href={`/admin/${v.id}`}
