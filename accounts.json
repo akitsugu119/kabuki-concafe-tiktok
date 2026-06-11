@@ -1,0 +1,153 @@
+{
+  "_comment": "店舗・源氏名・TikTokハンドルの一元管理。name/shop は自由に編集OK。active:false で取得停止",
+  "updatedAt": "2026-06-11T07:12:13.176Z",
+  "accounts": [
+    {
+      "handle": "1_2_sleepin",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@1_2_sleepin",
+      "active": true
+    },
+    {
+      "handle": "alice_prettytart",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@alice_prettytart",
+      "active": true
+    },
+    {
+      "handle": "annoe_concafe_",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@annoe_concafe_",
+      "active": true
+    },
+    {
+      "handle": "antl_noa",
+      "name": "のあ♡",
+      "shop": "",
+      "url": "https://www.tiktok.com/@antl_noa",
+      "active": true
+    },
+    {
+      "handle": "az_0001",
+      "name": "よわい🦋.*˚",
+      "shop": "",
+      "url": "https://www.tiktok.com/@az_0001",
+      "active": true
+    },
+    {
+      "handle": "belleetoile_of",
+      "name": "BelleÉtoileベルエトワール",
+      "shop": "",
+      "url": "https://www.tiktok.com/@belleetoile_of",
+      "active": true
+    },
+    {
+      "handle": "gauu_mauve",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@gauu_mauve",
+      "active": true
+    },
+    {
+      "handle": "maidevichan",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@maidevichan",
+      "active": true
+    },
+    {
+      "handle": "marymare.info",
+      "name": "Mary Mare（メアリーメア）歌舞伎町コンカフェ",
+      "shop": "",
+      "url": "https://www.tiktok.com/@marymare.info",
+      "active": true
+    },
+    {
+      "handle": "momonekodou001",
+      "name": "桃猫堂新宿店",
+      "shop": "",
+      "url": "https://www.tiktok.com/@momonekodou001",
+      "active": true
+    },
+    {
+      "handle": "oshinuma_",
+      "name": "推して沼って、また推して。",
+      "shop": "",
+      "url": "https://www.tiktok.com/@oshinuma_",
+      "active": true
+    },
+    {
+      "handle": "ralajabc30649",
+      "name": "ralajabc30649",
+      "shop": "",
+      "url": "https://www.tiktok.com/@ralajabc30649",
+      "active": true
+    },
+    {
+      "handle": "raymelan_",
+      "name": "レイメラン",
+      "shop": "",
+      "url": "https://www.tiktok.com/@raymelan_",
+      "active": true
+    },
+    {
+      "handle": "revelio_info",
+      "name": "Revelio -レベリオ-",
+      "shop": "",
+      "url": "https://www.tiktok.com/@revelio_info",
+      "active": true
+    },
+    {
+      "handle": "royal_melt",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@royal_melt",
+      "active": true
+    },
+    {
+      "handle": "scenario_bar",
+      "name": "scenario_bar",
+      "shop": "",
+      "url": "https://www.tiktok.com/@scenario_bar",
+      "active": true
+    },
+    {
+      "handle": "soko_otome",
+      "name": "装甲乙女",
+      "shop": "",
+      "url": "https://www.tiktok.com/@soko_otome",
+      "active": true
+    },
+    {
+      "handle": "sutorikusu_concafe",
+      "name": "すとりくす",
+      "shop": "",
+      "url": "https://www.tiktok.com/@sutorikusu_concafe",
+      "active": true
+    },
+    {
+      "handle": "ulooxxl",
+      "name": "もか",
+      "shop": "",
+      "url": "https://www.tiktok.com/@ulooxxl",
+      "active": true
+    },
+    {
+      "handle": "umr_lv100",
+      "name": "",
+      "shop": "",
+      "url": "https://www.tiktok.com/@umr_lv100",
+      "active": true
+    },
+    {
+      "handle": "yobisute_shinaide",
+      "name": "きょん(ハチちゃん)",
+      "shop": "",
+      "url": "https://www.tiktok.com/@yobisute_shinaide",
+      "active": true
+    }
+  ]
+}

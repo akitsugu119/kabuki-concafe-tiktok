@@ -5,12 +5,20 @@ import FilterBar from "./FilterBar";
 import VideoCard from "./VideoCard";
 import AdCard from "./AdCard";
 import { buildFeed, type FeedItem } from "@/lib/feed";
-import { getAds, getSettings, getVideos, trackAdView, trackView } from "@/lib/store";
+import { getAds, getSettings, getVideos, trackAdView, trackView, type SiteSettings } from "@/lib/store";
 import { useAsyncData } from "@/lib/useStore";
 import type { Ad, FeedFilter, Video } from "@/lib/types";
 
 const SEED_KEY = "kabuki.seed.v1";
 const FIXEDTOP_KEY = "kabuki.fixedTopShown.v1";
+
+/** 最終確認日時を「6/11 07:00」形式に */
+function formatChecked(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 function filterOffset(f: FeedFilter) {
   return f === "all" ? 0 : f === "pickup" ? 101 : 202;
@@ -19,7 +27,10 @@ function filterOffset(f: FeedFilter) {
 export default function VideoFeed() {
   const { data: videos, loading } = useAsyncData<Video[]>(getVideos, []);
   const { data: ads } = useAsyncData<Ad[]>(getAds, []);
-  const { data: settings } = useAsyncData<{ adInterval: number }>(getSettings, { adInterval: 0 });
+  const { data: settings } = useAsyncData<SiteSettings>(getSettings, {
+    adInterval: 0,
+    lastCheckedAt: null,
+  });
   const [filter, setFilter] = useState<FeedFilter>("all");
   const [mounted, setMounted] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -177,6 +188,15 @@ export default function VideoFeed() {
   return (
     <>
       <FilterBar value={filter} onChange={setFilter} />
+
+      {/* 右上：最終確認日（毎朝の自動更新が最後に走った日時） */}
+      {settings.lastCheckedAt && (
+        <div className="pointer-events-none fixed right-3 top-[calc(env(safe-area-inset-top)+50px)] z-20">
+          <span className="whitespace-nowrap text-[10px] leading-none text-white/45">
+            最終確認 {formatChecked(settings.lastCheckedAt)}
+          </span>
+        </div>
+      )}
 
       {/* 前へ／次へ ボタン（左中央に縦並び。TikTok操作ボタンや下部ボタンと重ならない位置）。
           iframe がスワイプを吸収して「どこを触れば次に行くか分からない」問題の対策。 */}

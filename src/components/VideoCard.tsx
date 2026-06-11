@@ -19,12 +19,21 @@ interface Props {
  * - 自動再生はしない。プレーヤーの再生ボタンをタップ＝音アリで再生（クロスオリジン埋め込みの制約のため、
  *   これが「1タップで動画＋音」を実現できる唯一の確実な方法）。
  */
+/** 追加から72時間以内なら「NEW」バッジを出す */
+function isNewVideo(createdAt?: string): boolean {
+  if (!createdAt) return false;
+  const t = Date.parse(createdAt);
+  if (Number.isNaN(t)) return false;
+  return Date.now() - t < 72 * 60 * 60 * 1000;
+}
+
 export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) {
   const { video, isFixedTopSlot } = item;
 
   const showPickupUI = video.isPickup || isFixedTopSlot;
   const showPr = isFixedTopSlot ? true : video.showPrLabel;
   const hasShop = !!video.shopOfficialUrl;
+  const showNew = isNewVideo(video.createdAt);
 
   const [thumb, setThumb] = useState<string | null>(null);
   const [handle, setHandle] = useState<string | null>(extractHandle(video.tiktokUrl));
@@ -107,6 +116,13 @@ export default function VideoCard({ item, shouldLoad, active, onEnded }: Props) 
             </span>
             {showPr && <span className="label-pr">PR</span>}
           </div>
+        )}
+
+        {/* 右上：NEWバッジ（自動更新で追加されてから72時間以内） */}
+        {showNew && (
+          <span className="pointer-events-none absolute right-3 top-3 z-10 rounded-full bg-neon-pink px-2.5 py-1 text-[10px] font-bold tracking-wider text-white shadow-neon">
+            NEW
+          </span>
         )}
       </div>
 

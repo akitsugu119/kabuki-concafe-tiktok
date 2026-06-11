@@ -186,10 +186,16 @@ function trackAd(id: string, field: "view" | "click") {
 export const trackAdView = (id: string) => trackAd(id, "view");
 export const trackAdClick = (id: string) => trackAd(id, "click");
 
-// ---- 設定（広告間隔） -----------------------------------------
-export async function getSettings(): Promise<{ adInterval: number }> {
+// ---- 設定（広告間隔・最終確認日時） ----------------------------
+export interface SiteSettings {
+  adInterval: number;
+  /** 自動更新スクリプトの最終確認日時（ISO）。未実行なら null */
+  lastCheckedAt?: string | null;
+}
+
+export async function getSettings(): Promise<SiteSettings> {
   const res = await fetch("/api/settings", { cache: "no-store" });
-  if (!res.ok) return { adInterval: 0 };
+  if (!res.ok) return { adInterval: 0, lastCheckedAt: null };
   return await res.json();
 }
 

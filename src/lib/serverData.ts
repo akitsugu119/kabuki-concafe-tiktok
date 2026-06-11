@@ -260,3 +260,20 @@ export async function setAdInterval(n: number): Promise<void> {
     [String(Math.max(0, Math.floor(n)))]
   );
 }
+
+// 最終確認日時（毎朝の自動更新スクリプトが実行完了時に記録する）
+export async function getLastChecked(): Promise<string | null> {
+  const rows = await query<{ value: string }>(
+    "SELECT value FROM settings WHERE key='last_checked_at'"
+  );
+  return rows.length ? rows[0].value : null;
+}
+
+export async function setLastChecked(iso: string): Promise<void> {
+  if (Number.isNaN(Date.parse(iso))) throw new Error("invalid date");
+  await query(
+    `INSERT INTO settings (key, value) VALUES ('last_checked_at', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+    [new Date(iso).toISOString()]
+  );
+}
